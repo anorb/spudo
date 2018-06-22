@@ -84,4 +84,4 @@ anaconda-mode/
 # End of https://www.gitignore.io/api/go,emacs
 
 # Ignore config files
-/data/
+*.toml

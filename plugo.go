@@ -1,7 +1,6 @@
 package plugo
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -21,12 +20,8 @@ import (
 // Config contains all options for the config file
 type Config struct {
 	Token                 string
-	LiveToken             string
-	DevToken              string
 	CommandPrefix         string
 	DefaultChannelID      string
-	LiveChannelID         string
-	DevChannelID          string
 	CooldownTimer         int
 	WelcomeBackMessage    string
 	CooldownMessage       string
@@ -45,19 +40,27 @@ type Bot struct {
 	TimersStarted       bool
 }
 
-func loadConfig(devMode *bool) Config {
-	var c Config
+func loadConfig() Config {
+	c := Config{
+		CommandPrefix:         "!",
+		CooldownTimer:         10,
+		CooldownMessage:       "Too many commands at once!",
+		WelcomeBackMessage:    "I'm back!",
+		UnknownCommandMessage: "Invalid command!",
+		PluginsDir:            "plugins",
+	}
 
-	if _, err := toml.DecodeFile("data/config.toml", &c); err != nil {
+	if _, err := toml.DecodeFile("config.toml", &c); err != nil {
 		log.Fatal("Error reading config - " + err.Error())
 	}
 
-	if *devMode {
-		c.Token = c.DevToken
-		c.DefaultChannelID = c.DevChannelID
-	} else {
-		c.Token = c.LiveToken
-		c.DefaultChannelID = c.LiveChannelID
+	if c.Token == "" {
+		log.Fatal("Error: No Token set in config")
+	}
+
+	if c.DefaultChannelID == "" {
+		log.Println("WARNING: No DefaultChannelID set in config")
+		log.Println("Welcome back message and timed messages will not be sent")
 	}
 
 	return c
@@ -117,11 +120,8 @@ func loadPlugins(pluginsDir string) (map[string]*pluginhandler.CommandPlugin, []
 func NewBot() *Bot {
 	rand.Seed(time.Now().UnixNano())
 
-	devMode := flag.Bool("dev", false, "Dev mode")
-	flag.Parse()
-
 	bot := &Bot{}
-	bot.Config = loadConfig(devMode)
+	bot.Config = loadConfig()
 
 	session, err := discordgo.New("Bot " + bot.Config.Token)
 	if err != nil {
