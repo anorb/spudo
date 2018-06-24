@@ -50,6 +50,7 @@ func main() {
 	}
 }
 ```
+Examples can be found [here](https://gitlab.com/anorb/plugo/tree/master/examples/bot).
 
 ## Basic plugin
 ### Create the plugin
@@ -71,3 +72,11 @@ func Register() interface{} {
 go build -buildmode=plugin ping.go
 ```
 ### Move ping.so to directory specified in your config
+
+Examples of the different kinds of plugins can be found [here](https://gitlab.com/anorb/plugo/tree/master/examples/plugins) along with a [small script](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/build.sh) to build plugins en masse.
+
+## FAQ
+
+### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
+
+Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow PluGo to convert it inside the bot and keep the plugin .so files ~1mb.
