@@ -149,10 +149,10 @@ func (b *Bot) Start() {
 }
 
 func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
-	if b.Config.WelcomeBackMessage != "" {
+	if b.Config.WelcomeBackMessage != "" && b.Config.DefaultChannelID != "" {
 		b.sendMessage(b.Config.DefaultChannelID, b.Config.WelcomeBackMessage)
 	}
-	if !b.TimersStarted {
+	if !b.TimersStarted && b.Config.DefaultChannelID != "" {
 		b.startTimedMessages()
 	}
 }
