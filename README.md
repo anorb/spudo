@@ -77,6 +77,13 @@ Examples of the different kinds of plugins can be found [here](https://gitlab.co
 
 ## FAQ
 
+### What kind of plugins can be made?
+
+- [Return a string response to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/ping/ping.go)
+- [Return a Discord embed message to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/embed/embed.go)
+- [Add reaction to specific user's messages](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/userreaction/userreaction.go)
+- [Send a message (string or embed) at specific time](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/fiveseconds/fiveseconds.go)
+
 ### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
 
 Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow PluGo to convert it inside the bot and keep the plugin .so files ~1mb.
