@@ -163,48 +163,8 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
-	if strings.HasPrefix(m.Content, b.Config.CommandPrefix) {
-		if !b.canPost(m.Author.ID) {
-			b.respondToUser(m, b.Config.CooldownMessage)
-			return
-		}
-		commandText := strings.Split(strings.TrimPrefix(m.Content, b.Config.CommandPrefix), " ")
-
-		for i, text := range commandText {
-			commandText[i] = strings.ToLower(text)
-		}
-
-		com := commandText[0]
-		args := commandText[1:len(commandText)]
-		commandResp, isPrivate := b.attemptCommand(com, args)
-
-		switch v := commandResp.(type) {
-		case string:
-			if isPrivate {
-				b.sendPrivateMessage(m.Author.ID, v)
-			} else {
-				b.respondToUser(m, v)
-			}
-			b.startCooldown(m.Author.ID)
-		case *utils.Embed:
-			e := embed.Convert(v)
-
-			if isPrivate {
-				b.sendPrivateMessage(m.Author.ID, e.MessageEmbed)
-			} else {
-				b.sendEmbed(m.ChannelID, e.MessageEmbed)
-			}
-			b.startCooldown(m.Author.ID)
-		default:
-			b.respondToUser(m, b.Config.UnknownCommandMessage)
-		}
-	}
-
-	for _, reaction := range b.AddReactionPlugin {
-		if reaction.UserID == m.Author.ID {
-			b.addReaction(m, reaction.ReactionID)
-		}
-	}
+	b.handleCommand(m)
+	b.handleAddReaction(m)
 }
 
 // sendMessage is a helper function around ChannelMessageSend from
@@ -231,6 +191,7 @@ func (b *Bot) sendPrivateMessage(userID string, message interface{}) {
 	privChannel, err := b.Session.UserChannelCreate(userID)
 	if err != nil {
 		log.Println("Error creating private channel - " + err.Error())
+		return
 	}
 	switch v := message.(type) {
 	case string:
@@ -264,6 +225,55 @@ func (b *Bot) attemptCommand(comStr string, args []string) (resp interface{}, pr
 		return
 	}
 	return
+}
+
+func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
+	if !strings.HasPrefix(m.Content, b.Config.CommandPrefix) {
+		return
+	}
+	if !b.canPost(m.Author.ID) {
+		b.respondToUser(m, b.Config.CooldownMessage)
+		return
+	}
+
+	commandText := strings.Split(strings.TrimPrefix(m.Content, b.Config.CommandPrefix), " ")
+
+	for i, text := range commandText {
+		commandText[i] = strings.ToLower(text)
+	}
+
+	com := commandText[0]
+	args := commandText[1:len(commandText)]
+	commandResp, isPrivate := b.attemptCommand(com, args)
+
+	switch v := commandResp.(type) {
+	case string:
+		if isPrivate {
+			b.sendPrivateMessage(m.Author.ID, v)
+		} else {
+			b.respondToUser(m, v)
+		}
+		b.startCooldown(m.Author.ID)
+	case *utils.Embed:
+		e := embed.Convert(v)
+
+		if isPrivate {
+			b.sendPrivateMessage(m.Author.ID, e.MessageEmbed)
+		} else {
+			b.sendEmbed(m.ChannelID, e.MessageEmbed)
+		}
+		b.startCooldown(m.Author.ID)
+	default:
+		b.respondToUser(m, b.Config.UnknownCommandMessage)
+	}
+}
+
+func (b *Bot) handleAddReaction(m *discordgo.MessageCreate) {
+	for _, reaction := range b.AddReactionPlugin {
+		if reaction.UserID == m.Author.ID {
+			b.addReaction(m, reaction.ReactionID)
+		}
+	}
 }
 
 // Returns whether or not the user can issue a command based on a timer.
