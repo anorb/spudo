@@ -108,6 +108,11 @@ func loadPlugins(pluginsDir string) (map[string]*pluginhandler.CommandPlugin, []
 		case *pluginhandler.AddReactionPlugin:
 			addReactionPlugins = append(addReactionPlugins, v)
 			fmt.Printf("%s plugin registered as an add reaction\n", v.Name)
+		case []*pluginhandler.CommandPlugin:
+			for _, p := range v {
+				commandPlugins[strings.ToLower(p.Name)] = p
+				fmt.Printf("%s plugin registered as a command\n", p.Name)
+			}
 		default:
 			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
 		}
