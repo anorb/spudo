@@ -35,7 +35,7 @@ type Bot struct {
 	Config              Config
 	CommandPlugins      map[string]*pluginhandler.CommandPlugin
 	TimedMessagePlugins []*pluginhandler.TimedMessagePlugin
-	AddReactionPlugin   []*pluginhandler.AddReactionPlugin
+	AddReactionPlugins  []*pluginhandler.AddReactionPlugin
 	CooldownList        map[string]time.Time
 	TimersStarted       bool
 }
@@ -66,60 +66,6 @@ func loadConfig() Config {
 	return c
 }
 
-// loadPlugins gets all the plugins (any .so file) and looks for the
-// Register function then executes it. It then adds it to the
-// applicable map or slice and returns the various types of plugins.
-func loadPlugins(pluginsDir string) (map[string]*pluginhandler.CommandPlugin, []*pluginhandler.TimedMessagePlugin, []*pluginhandler.AddReactionPlugin) {
-	pluginFiles, err := filepath.Glob(fmt.Sprintf("%s/*.so", pluginsDir))
-	if err != nil {
-		log.Panic("Error read the plugin directory")
-	}
-
-	var commandPlugins = make(map[string]*pluginhandler.CommandPlugin)
-	var timedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
-	var addReactionPlugins = make([]*pluginhandler.AddReactionPlugin, 0)
-
-	for _, filename := range pluginFiles {
-		p, err := plugin.Open(filename)
-		if err != nil {
-			log.Fatalf("Error opening plugin: %s - %s", filename, err)
-		}
-
-		reg, err := p.Lookup("Register")
-		if err != nil {
-			log.Println("Register function not found in plugin: " + filename)
-			continue
-		}
-
-		registerPlugin, ok := reg.(func() interface{})
-		if !ok {
-			log.Println("Error registering plugin: " + filename)
-			continue
-		}
-		c := registerPlugin()
-
-		switch v := c.(type) {
-		case *pluginhandler.CommandPlugin:
-			commandPlugins[strings.ToLower(v.Name)] = v
-			fmt.Printf("%s plugin registered as a command\n", v.Name)
-		case *pluginhandler.TimedMessagePlugin:
-			timedMessagePlugins = append(timedMessagePlugins, v)
-			fmt.Printf("%s plugin registered as a timed message\n", v.Name)
-		case *pluginhandler.AddReactionPlugin:
-			addReactionPlugins = append(addReactionPlugins, v)
-			fmt.Printf("%s plugin registered as an add reaction\n", v.Name)
-		case []*pluginhandler.CommandPlugin:
-			for _, p := range v {
-				commandPlugins[strings.ToLower(p.Name)] = p
-				fmt.Printf("%s plugin registered as a command\n", p.Name)
-			}
-		default:
-			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
-		}
-	}
-	return commandPlugins, timedMessagePlugins, addReactionPlugins
-}
-
 // NewBot will create a new Bot and return it. It will also load
 // Config and all plugins that are currently available.
 func NewBot() *Bot {
@@ -136,9 +82,76 @@ func NewBot() *Bot {
 
 	bot.CooldownList = make(map[string]time.Time)
 
-	bot.CommandPlugins, bot.TimedMessagePlugins, bot.AddReactionPlugin = loadPlugins(bot.Config.PluginsDir)
+	if err := bot.loadPlugins(); err != nil {
+		log.Fatal(err)
+	}
 
 	return bot
+}
+
+// loadPlugins gets all the plugins (any .so file in the pluginsDir)
+// and looks for the Register function then executes it. It then adds
+// the plugin to the applicable map or slice.
+func (b *Bot) loadPlugins() error {
+	pluginFiles, err := filepath.Glob(fmt.Sprintf("%s/*.so", b.Config.PluginsDir))
+	if err != nil {
+		return fmt.Errorf("Error reading the plugin directory - pluginsDir value: %v", b.Config.PluginsDir)
+	}
+
+	b.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
+	b.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
+	b.AddReactionPlugins = make([]*pluginhandler.AddReactionPlugin, 0)
+
+	for _, filename := range pluginFiles {
+		p, err := plugin.Open(filename)
+		if err != nil {
+			fmt.Printf("Error opening plugin, ignoring: %s - %s\n", filename, err)
+			continue
+		}
+
+		reg, err := p.Lookup("Register")
+		if err != nil {
+			fmt.Println("Register function not found in plugin, ignoring: " + filename)
+			continue
+		}
+
+		registerPlugin, ok := reg.(func() interface{})
+		if !ok {
+			fmt.Println("Error with plugin Register function, ignoring: " + filename)
+			continue
+		}
+		c := registerPlugin()
+
+		switch v := c.(type) {
+		case *pluginhandler.CommandPlugin:
+			b.CommandPlugins[strings.ToLower(v.Name)] = v
+			fmt.Printf("%s plugin registered as a command\n", v.Name)
+		case *pluginhandler.TimedMessagePlugin:
+			b.TimedMessagePlugins = append(b.TimedMessagePlugins, v)
+			fmt.Printf("%s plugin registered as a timed message\n", v.Name)
+		case *pluginhandler.AddReactionPlugin:
+			b.AddReactionPlugins = append(b.AddReactionPlugins, v)
+			fmt.Printf("%s plugin registered as an add reaction\n", v.Name)
+		case []*pluginhandler.CommandPlugin:
+			for _, p := range v {
+				b.CommandPlugins[strings.ToLower(p.Name)] = p
+				fmt.Printf("%s plugin registered as a command\n", p.Name)
+			}
+		case []*pluginhandler.TimedMessagePlugin:
+			for _, p := range v {
+				b.TimedMessagePlugins = append(b.TimedMessagePlugins, p)
+				fmt.Printf("%s plugin registered as a timed message\n", p.Name)
+			}
+		case []*pluginhandler.AddReactionPlugin:
+			for _, p := range v {
+				b.AddReactionPlugins = append(b.AddReactionPlugins, p)
+				fmt.Printf("%s plugin registered as an add reaction\n", p.Name)
+			}
+		default:
+			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
+		}
+	}
+	return nil
 }
 
 // Start will add handler function to the Session and open the
