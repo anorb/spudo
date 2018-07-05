@@ -83,6 +83,7 @@ Examples of the different kinds of plugins can be found [here](https://gitlab.co
 - [Return a Discord embed message to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/embed/embed.go)
 - [Add reaction to specific user's messages](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/userreaction/userreaction.go)
 - [Send a message (string or embed) at specific time](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/fiveseconds/fiveseconds.go)
+  - The second argument in this example uses [cron-style](https://en.wikipedia.org/wiki/Cron) strings to define when the messages should be sent
 - [Add multiple commands with a single plugin](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/multiplecommands/multiplecommands.go) (Adding multiple commands in this way works for all other types of commands as well)
 
 ### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
