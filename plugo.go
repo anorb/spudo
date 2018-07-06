@@ -40,39 +40,16 @@ type Bot struct {
 	TimersStarted       bool
 }
 
-func loadConfig() Config {
-	c := Config{
-		CommandPrefix:         "!",
-		CooldownTimer:         10,
-		CooldownMessage:       "Too many commands at once!",
-		WelcomeBackMessage:    "I'm back!",
-		UnknownCommandMessage: "Invalid command!",
-		PluginsDir:            "plugins",
-	}
-
-	if _, err := toml.DecodeFile("config.toml", &c); err != nil {
-		log.Fatal("Error reading config - " + err.Error())
-	}
-
-	if c.Token == "" {
-		log.Fatal("Error: No Token set in config")
-	}
-
-	if c.DefaultChannelID == "" {
-		log.Println("WARNING: No DefaultChannelID set in config")
-		log.Println("Welcome back message and timed messages will not be sent")
-	}
-
-	return c
-}
-
 // NewBot will create a new Bot and return it. It will also load
 // Config and all plugins that are currently available.
 func NewBot() *Bot {
 	rand.Seed(time.Now().UnixNano())
 
 	bot := &Bot{}
-	bot.Config = loadConfig()
+
+	if err := bot.loadConfig(); err != nil {
+		log.Fatal(err)
+	}
 
 	session, err := discordgo.New("Bot " + bot.Config.Token)
 	if err != nil {
@@ -87,6 +64,33 @@ func NewBot() *Bot {
 	}
 
 	return bot
+}
+
+func (b *Bot) loadConfig() error {
+	// Set default config
+	b.Config = Config{
+		CommandPrefix:         "!",
+		CooldownTimer:         10,
+		CooldownMessage:       "Too many commands at once!",
+		WelcomeBackMessage:    "I'm back!",
+		UnknownCommandMessage: "Invalid command!",
+		PluginsDir:            "plugins",
+	}
+
+	if _, err := toml.DecodeFile("config.toml", &b.Config); err != nil {
+		return fmt.Errorf("Error reading config - %v", err.Error())
+	}
+
+	if b.Config.Token == "" {
+		return fmt.Errorf("Error: No Token set in config")
+	}
+
+	if b.Config.DefaultChannelID == "" {
+		log.Println("WARNING: No DefaultChannelID set in config")
+		log.Println("Welcome back message and timed messages will not be sent")
+	}
+
+	return nil
 }
 
 // loadPlugins gets all the plugins (any .so file in the pluginsDir)
@@ -287,7 +291,7 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) handleAddReaction(m *discordgo.MessageCreate) {
-	for _, reaction := range b.AddReactionPlugin {
+	for _, reaction := range b.AddReactionPlugins {
 		if reaction.UserID == m.Author.ID {
 			b.addReaction(m, reaction.ReactionID)
 		}
