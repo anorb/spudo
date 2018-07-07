@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"plugin"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -167,6 +170,18 @@ func (b *Bot) Start() {
 	err := b.Session.Open()
 	if err != nil {
 		log.Fatal("Error opening websocket connection - " + err.Error())
+	}
+
+	fmt.Println("Bot is now running. Press CTRL-C to exit.")
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	<-c
+
+	fmt.Println("Bot is now shutting down.")
+
+	if err := b.Session.Close(); err != nil {
+		log.Fatal("Error closing discord session" + err.Error())
 	}
 }
 
