@@ -61,6 +61,9 @@ func NewBot() *Bot {
 	bot.Session = session
 
 	bot.CooldownList = make(map[string]time.Time)
+	bot.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
+	bot.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
+	bot.AddReactionPlugins = make([]*pluginhandler.AddReactionPlugin, 0)
 
 	if err := bot.loadPlugins(); err != nil {
 		log.Fatal(err)
@@ -104,10 +107,6 @@ func (b *Bot) loadPlugins() error {
 	if err != nil {
 		return fmt.Errorf("Error reading the plugin directory - pluginsDir value: %v", b.Config.PluginsDir)
 	}
-
-	b.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
-	b.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
-	b.AddReactionPlugins = make([]*pluginhandler.AddReactionPlugin, 0)
 
 	for _, filename := range pluginFiles {
 		p, err := plugin.Open(filename)
