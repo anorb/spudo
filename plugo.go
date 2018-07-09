@@ -131,34 +131,43 @@ func (b *Bot) loadPlugins() error {
 
 		switch v := c.(type) {
 		case *pluginhandler.CommandPlugin:
-			b.CommandPlugins[strings.ToLower(v.Name)] = v
-			fmt.Printf("%s plugin registered as a command\n", v.Name)
+			b.addCommandPlugin(v)
 		case *pluginhandler.TimedMessagePlugin:
-			b.TimedMessagePlugins = append(b.TimedMessagePlugins, v)
-			fmt.Printf("%s plugin registered as a timed message\n", v.Name)
+			b.addTimedMessagePlugin(v)
 		case *pluginhandler.AddReactionPlugin:
-			b.AddReactionPlugins = append(b.AddReactionPlugins, v)
-			fmt.Printf("%s plugin registered as an add reaction\n", v.Name)
+			b.addReactionPlugin(v)
 		case []*pluginhandler.CommandPlugin:
 			for _, p := range v {
-				b.CommandPlugins[strings.ToLower(p.Name)] = p
-				fmt.Printf("%s plugin registered as a command\n", p.Name)
+				b.addCommandPlugin(p)
 			}
 		case []*pluginhandler.TimedMessagePlugin:
 			for _, p := range v {
-				b.TimedMessagePlugins = append(b.TimedMessagePlugins, p)
-				fmt.Printf("%s plugin registered as a timed message\n", p.Name)
+				b.addTimedMessagePlugin(p)
 			}
 		case []*pluginhandler.AddReactionPlugin:
 			for _, p := range v {
-				b.AddReactionPlugins = append(b.AddReactionPlugins, p)
-				fmt.Printf("%s plugin registered as an add reaction\n", p.Name)
+				b.addReactionPlugin(p)
 			}
 		default:
 			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
 		}
 	}
 	return nil
+}
+
+func (b *Bot) addCommandPlugin(plugin *pluginhandler.CommandPlugin) {
+	b.CommandPlugins[strings.ToLower(plugin.Name)] = plugin
+	fmt.Printf("%s plugin registered as a command\n", plugin.Name)
+}
+
+func (b *Bot) addTimedMessagePlugin(plugin *pluginhandler.TimedMessagePlugin) {
+	b.TimedMessagePlugins = append(b.TimedMessagePlugins, plugin)
+	fmt.Printf("%s plugin registered as a timed message\n", plugin.Name)
+}
+
+func (b *Bot) addReactionPlugin(plugin *pluginhandler.AddReactionPlugin) {
+	b.AddReactionPlugins = append(b.AddReactionPlugins, plugin)
+	fmt.Printf("%s plugin registered as an add reaction\n", plugin.Name)
 }
 
 // Start will add handler function to the Session and open the
