@@ -4,5 +4,5 @@ import "gitlab.com/anorb/plugo/pluginhandler"
 
 // Register ...
 func Register() interface{} {
-	return pluginhandler.NewAddReaction("userreaction", "478431893247966985", "👍")
+	return pluginhandler.NewUserReaction("userreaction", "138198523144306689", "👍")
 }

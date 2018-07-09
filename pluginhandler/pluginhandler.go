@@ -15,8 +15,8 @@ type TimedMessagePlugin struct {
 	Exec       func() interface{} // Function that will be executed based on the CronString
 }
 
-// AddReactionPlugin contains information for a trigger to add reactions to messages
-type AddReactionPlugin struct {
+// UserReactionPlugin contains information for a trigger to add reactions to a specific user's messages
+type UserReactionPlugin struct {
 	Name       string // Name of plugin
 	UserID     string // UserID of user the reactions will apply to
 	ReactionID string // ReactionID of the reaction that will be applied to the message
@@ -50,8 +50,8 @@ func NewTimedMessage(name string, cronString string, f func() interface{}) *Time
 	return &TimedMessagePlugin{Name: name, CronString: cronString, Exec: f}
 }
 
-// NewAddReaction is a helper method that creates a new
-// AddReactionPlugin with the required fields and returns the AddReactionPlugin
-func NewAddReaction(name string, userID string, reactionID string) *AddReactionPlugin {
-	return &AddReactionPlugin{Name: name, UserID: userID, ReactionID: reactionID}
+// NewUserReaction is a helper method that creates a new UserReactionPlugin
+// with the required fields and returns the UserReactionPlugin
+func NewUserReaction(name string, userID string, reactionID string) *UserReactionPlugin {
+	return &UserReactionPlugin{Name: name, UserID: userID, ReactionID: reactionID}
 }

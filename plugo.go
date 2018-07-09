@@ -38,7 +38,7 @@ type Bot struct {
 	Config              Config
 	CommandPlugins      map[string]*pluginhandler.CommandPlugin
 	TimedMessagePlugins []*pluginhandler.TimedMessagePlugin
-	AddReactionPlugins  []*pluginhandler.AddReactionPlugin
+	UserReactionPlugins []*pluginhandler.UserReactionPlugin
 	CooldownList        map[string]time.Time
 	TimersStarted       bool
 }
@@ -63,7 +63,7 @@ func NewBot() *Bot {
 	bot.CooldownList = make(map[string]time.Time)
 	bot.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
 	bot.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
-	bot.AddReactionPlugins = make([]*pluginhandler.AddReactionPlugin, 0)
+	bot.UserReactionPlugins = make([]*pluginhandler.UserReactionPlugin, 0)
 
 	if err := bot.loadPlugins(); err != nil {
 		log.Fatal(err)
@@ -133,8 +133,8 @@ func (b *Bot) loadPlugins() error {
 			b.addCommandPlugin(v)
 		case *pluginhandler.TimedMessagePlugin:
 			b.addTimedMessagePlugin(v)
-		case *pluginhandler.AddReactionPlugin:
-			b.addReactionPlugin(v)
+		case *pluginhandler.UserReactionPlugin:
+			b.addUserReactionPlugin(v)
 		case []*pluginhandler.CommandPlugin:
 			for _, p := range v {
 				b.addCommandPlugin(p)
@@ -143,9 +143,9 @@ func (b *Bot) loadPlugins() error {
 			for _, p := range v {
 				b.addTimedMessagePlugin(p)
 			}
-		case []*pluginhandler.AddReactionPlugin:
+		case []*pluginhandler.UserReactionPlugin:
 			for _, p := range v {
-				b.addReactionPlugin(p)
+				b.addUserReactionPlugin(p)
 			}
 		default:
 			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
@@ -164,8 +164,8 @@ func (b *Bot) addTimedMessagePlugin(plugin *pluginhandler.TimedMessagePlugin) {
 	fmt.Printf("%s plugin registered as a timed message\n", plugin.Name)
 }
 
-func (b *Bot) addReactionPlugin(plugin *pluginhandler.AddReactionPlugin) {
-	b.AddReactionPlugins = append(b.AddReactionPlugins, plugin)
+func (b *Bot) addUserReactionPlugin(plugin *pluginhandler.UserReactionPlugin) {
+	b.UserReactionPlugins = append(b.UserReactionPlugins, plugin)
 	fmt.Printf("%s plugin registered as an add reaction\n", plugin.Name)
 }
 
@@ -314,7 +314,7 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) handleAddReaction(m *discordgo.MessageCreate) {
-	for _, reaction := range b.AddReactionPlugins {
+	for _, reaction := range b.UserReactionPlugins {
 		if reaction.UserID == m.Author.ID {
 			b.addReaction(m, reaction.ReactionID)
 		}
