@@ -34,13 +34,14 @@ type Config struct {
 
 // Bot contains everything about the bot itself
 type Bot struct {
-	Session             *discordgo.Session
-	Config              Config
-	CommandPlugins      map[string]*pluginhandler.CommandPlugin
-	TimedMessagePlugins []*pluginhandler.TimedMessagePlugin
-	UserReactionPlugins []*pluginhandler.UserReactionPlugin
-	CooldownList        map[string]time.Time
-	TimersStarted       bool
+	Session                *discordgo.Session
+	Config                 Config
+	CommandPlugins         map[string]*pluginhandler.CommandPlugin
+	TimedMessagePlugins    []*pluginhandler.TimedMessagePlugin
+	UserReactionPlugins    []*pluginhandler.UserReactionPlugin
+	MessageReactionPlugins []*pluginhandler.MessageReactionPlugin
+	CooldownList           map[string]time.Time
+	TimersStarted          bool
 }
 
 // NewBot will create a new Bot and return it. It will also load
@@ -64,6 +65,7 @@ func NewBot() *Bot {
 	bot.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
 	bot.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
 	bot.UserReactionPlugins = make([]*pluginhandler.UserReactionPlugin, 0)
+	bot.MessageReactionPlugins = make([]*pluginhandler.MessageReactionPlugin, 0)
 
 	if err := bot.loadPlugins(); err != nil {
 		log.Fatal(err)
@@ -135,6 +137,8 @@ func (b *Bot) loadPlugins() error {
 			b.addTimedMessagePlugin(v)
 		case *pluginhandler.UserReactionPlugin:
 			b.addUserReactionPlugin(v)
+		case *pluginhandler.MessageReactionPlugin:
+			b.addMessageReactionPlugin(v)
 		case []*pluginhandler.CommandPlugin:
 			for _, p := range v {
 				b.addCommandPlugin(p)
@@ -146,6 +150,10 @@ func (b *Bot) loadPlugins() error {
 		case []*pluginhandler.UserReactionPlugin:
 			for _, p := range v {
 				b.addUserReactionPlugin(p)
+			}
+		case []*pluginhandler.MessageReactionPlugin:
+			for _, p := range v {
+				b.addMessageReactionPlugin(p)
 			}
 		default:
 			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
@@ -166,7 +174,12 @@ func (b *Bot) addTimedMessagePlugin(plugin *pluginhandler.TimedMessagePlugin) {
 
 func (b *Bot) addUserReactionPlugin(plugin *pluginhandler.UserReactionPlugin) {
 	b.UserReactionPlugins = append(b.UserReactionPlugins, plugin)
-	fmt.Printf("%s plugin registered as an add reaction\n", plugin.Name)
+	fmt.Printf("%s plugin registered as a user reaction\n", plugin.Name)
+}
+
+func (b *Bot) addMessageReactionPlugin(plugin *pluginhandler.MessageReactionPlugin) {
+	b.MessageReactionPlugins = append(b.MessageReactionPlugins, plugin)
+	fmt.Printf("%s plugin registered as a message reaction\n", plugin.Name)
 }
 
 // Start will add handler function to the Session and open the
@@ -210,6 +223,7 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 	b.handleCommand(m)
 	b.handleUserReaction(m)
+	b.handleMessageReaction(m)
 }
 
 // sendMessage is a helper function around ChannelMessageSend from
@@ -314,9 +328,17 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
-	for _, reaction := range b.UserReactionPlugins {
-		if reaction.UserID == m.Author.ID {
-			b.addReaction(m, reaction.ReactionID)
+	for _, plugin := range b.UserReactionPlugins {
+		if plugin.UserID == m.Author.ID {
+			b.addReaction(m, plugin.ReactionID)
+		}
+	}
+}
+
+func (b *Bot) handleMessageReaction(m *discordgo.MessageCreate) {
+	for _, plugin := range b.MessageReactionPlugins {
+		if strings.Contains(strings.ToLower(m.Content), strings.ToLower(plugin.TriggerWord)) {
+			b.addReaction(m, plugin.ReactionID)
 		}
 	}
 }

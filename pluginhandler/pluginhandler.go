@@ -22,6 +22,14 @@ type UserReactionPlugin struct {
 	ReactionID string // ReactionID of the reaction that will be applied to the message
 }
 
+// MessageReactionPlugin contains information for a trigger to add
+// reaction when a message contains a specific TriggerWord
+type MessageReactionPlugin struct {
+	Name        string
+	TriggerWord string
+	ReactionID  string
+}
+
 // NewCommand is a helper method that creates a new CommandPlugin with
 // the required fields and returns the CommandPlugin
 func NewCommand(name string, f func(args []string) interface{}) *CommandPlugin {
@@ -54,4 +62,11 @@ func NewTimedMessage(name string, cronString string, f func() interface{}) *Time
 // with the required fields and returns the UserReactionPlugin
 func NewUserReaction(name string, userID string, reactionID string) *UserReactionPlugin {
 	return &UserReactionPlugin{Name: name, UserID: userID, ReactionID: reactionID}
+}
+
+// NewMessageReaction is a helper method that creates a
+// MessageReactionPlugin with the required fields and returns the
+// MessageReactionPlugin
+func NewMessageReaction(name string, triggerWord string, reactionID string) *MessageReactionPlugin {
+	return &MessageReactionPlugin{Name: name, TriggerWord: triggerWord, ReactionID: reactionID}
 }
