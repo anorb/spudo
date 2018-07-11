@@ -209,7 +209,7 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	b.handleCommand(m)
-	b.handleAddReaction(m)
+	b.handleUserReaction(m)
 }
 
 // sendMessage is a helper function around ChannelMessageSend from
@@ -313,7 +313,7 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 	}
 }
 
-func (b *Bot) handleAddReaction(m *discordgo.MessageCreate) {
+func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
 	for _, reaction := range b.UserReactionPlugins {
 		if reaction.UserID == m.Author.ID {
 			b.addReaction(m, reaction.ReactionID)
