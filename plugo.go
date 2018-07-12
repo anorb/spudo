@@ -1,6 +1,7 @@
 package plugo
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -47,34 +48,16 @@ type Bot struct {
 // NewBot will create a new Bot and return it. It will also load
 // Config and all plugins that are currently available.
 func NewBot() *Bot {
-	rand.Seed(time.Now().UnixNano())
-
 	bot := &Bot{}
-
-	if err := bot.loadConfig(); err != nil {
-		log.Fatal(err)
-	}
-
-	session, err := discordgo.New("Bot " + bot.Config.Token)
-	if err != nil {
-		log.Fatal("Error creating Discord session - " + err.Error())
-	}
-	bot.Session = session
-
 	bot.CooldownList = make(map[string]time.Time)
 	bot.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
 	bot.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
 	bot.UserReactionPlugins = make([]*pluginhandler.UserReactionPlugin, 0)
 	bot.MessageReactionPlugins = make([]*pluginhandler.MessageReactionPlugin, 0)
-
-	if err := bot.loadPlugins(); err != nil {
-		log.Fatal(err)
-	}
-
 	return bot
 }
 
-func (b *Bot) loadConfig() error {
+func (b *Bot) loadConfig(configPath string) error {
 	// Set default config
 	b.Config = Config{
 		CommandPrefix:         "!",
@@ -85,7 +68,7 @@ func (b *Bot) loadConfig() error {
 		PluginsDir:            "plugins",
 	}
 
-	if _, err := toml.DecodeFile("config.toml", &b.Config); err != nil {
+	if _, err := toml.DecodeFile(configPath, &b.Config); err != nil {
 		return fmt.Errorf("Error reading config - %v", err.Error())
 	}
 
@@ -101,13 +84,26 @@ func (b *Bot) loadConfig() error {
 	return nil
 }
 
+func (b *Bot) createSession() error {
+	session, err := discordgo.New("Bot " + b.Config.Token)
+	if err != nil {
+		return fmt.Errorf("Error creating Discord session - %v", err.Error())
+	}
+	b.Session = session
+	return nil
+}
+
 // loadPlugins gets all the plugins (any .so file in the pluginsDir)
 // and looks for the Register function then executes it. It then adds
 // the plugin to the applicable map or slice.
 func (b *Bot) loadPlugins() error {
+	if _, err := os.Stat(b.Config.PluginsDir); os.IsNotExist(err) {
+		return fmt.Errorf("Error reading the plugin directory - %v", err)
+	}
+
 	pluginFiles, err := filepath.Glob(fmt.Sprintf("%s/*.so", b.Config.PluginsDir))
 	if err != nil {
-		return fmt.Errorf("Error reading the plugin directory - pluginsDir value: %v", b.Config.PluginsDir)
+		return fmt.Errorf("Globbing pattern malformed - %v", err)
 	}
 
 	for _, filename := range pluginFiles {
@@ -185,11 +181,27 @@ func (b *Bot) addMessageReactionPlugin(plugin *pluginhandler.MessageReactionPlug
 // Start will add handler function to the Session and open the
 // websocket connection.
 func (b *Bot) Start() {
+	configPath := flag.String("config", "./config.toml", "TODO")
+	flag.Parse()
+
+	rand.Seed(time.Now().UnixNano())
+
+	if err := b.loadConfig(*configPath); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := b.createSession(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := b.loadPlugins(); err != nil {
+		log.Fatal(err)
+	}
+
 	b.Session.AddHandler(b.onReady)
 	b.Session.AddHandler(b.onMessageCreate)
 
-	err := b.Session.Open()
-	if err != nil {
+	if err := b.Session.Open(); err != nil {
 		log.Fatal("Error opening websocket connection - " + err.Error())
 	}
 

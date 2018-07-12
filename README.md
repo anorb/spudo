@@ -77,3 +77,8 @@ Examples of the different kinds of plugins can be found [here](https://gitlab.co
 ### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
 
 Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow PluGo to convert it inside the bot and keep the plugin .so files ~1mb.
+
+### What if I want to put the config.toml file somewhere else?
+```sh
+./bot -config=./path/to/wherever
+```
