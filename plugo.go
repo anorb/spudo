@@ -1,6 +1,7 @@
 package plugo
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -57,9 +58,21 @@ func NewBot() *Bot {
 	return bot
 }
 
-func (b *Bot) loadConfig(configPath string) error {
-	// Set default config
-	b.Config = Config{
+// Ask user for input using prompt and returns the entry and any
+// errors
+func getInput(prompt string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(prompt)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.Replace(input, "\n", "", -1), nil
+}
+
+// Returns the default config settings for the bot
+func getDefaultConfig() Config {
+	return Config{
 		CommandPrefix:         "!",
 		CooldownTimer:         10,
 		CooldownMessage:       "Too many commands at once!",
@@ -67,6 +80,43 @@ func (b *Bot) loadConfig(configPath string) error {
 		UnknownCommandMessage: "Invalid command!",
 		PluginsDir:            "plugins",
 	}
+}
+
+// createMinimalConfig prompts the user to enter a Token and
+// DefaultChannelID for the Config. This is used if no config is
+// found.
+func (b *Bot) createMinimalConfig() error {
+	// Set default config
+	b.Config = getDefaultConfig()
+	path := "./config.toml"
+
+	var err error
+	b.Config.Token, err = getInput("Token: ")
+	if err != nil {
+		return err
+	}
+
+	b.Config.DefaultChannelID, err = getInput("Default channel ID: ")
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = toml.NewEncoder(f).Encode(b.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *Bot) loadConfig(configPath string) error {
+	// Set default config
+	b.Config = getDefaultConfig()
 
 	if _, err := toml.DecodeFile(configPath, &b.Config); err != nil {
 		return fmt.Errorf("Error reading config - %v", err.Error())
@@ -185,6 +235,14 @@ func (b *Bot) Start() {
 	flag.Parse()
 
 	rand.Seed(time.Now().UnixNano())
+
+	// Check if config exists, if it doesn't use
+	// createMinimalConfig to generate one.
+	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
+		if err := b.createMinimalConfig(); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	if err := b.loadConfig(*configPath); err != nil {
 		log.Fatal(err)
