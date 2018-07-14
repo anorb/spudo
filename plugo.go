@@ -91,12 +91,12 @@ func (b *Bot) createMinimalConfig() error {
 	path := "./config.toml"
 
 	var err error
-	b.Config.Token, err = getInput("Token: ")
+	b.Config.Token, err = getInput("Eneter token: ")
 	if err != nil {
 		return err
 	}
 
-	b.Config.DefaultChannelID, err = getInput("Default channel ID: ")
+	b.Config.DefaultChannelID, err = getInput("Enter default channel ID: ")
 	if err != nil {
 		return err
 	}
@@ -239,6 +239,7 @@ func (b *Bot) Start() {
 	// Check if config exists, if it doesn't use
 	// createMinimalConfig to generate one.
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
+		fmt.Println("Config not detected, attempting to create...")
 		if err := b.createMinimalConfig(); err != nil {
 			log.Fatal(err)
 		}
