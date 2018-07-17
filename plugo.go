@@ -292,9 +292,9 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
-	b.handleCommand(m)
-	b.handleUserReaction(m)
-	b.handleMessageReaction(m)
+	go b.handleCommand(m)
+	go b.handleUserReaction(m)
+	go b.handleMessageReaction(m)
 }
 
 // sendMessage is a helper function around ChannelMessageSend from
