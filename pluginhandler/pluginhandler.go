@@ -17,17 +17,17 @@ type TimedMessagePlugin struct {
 
 // UserReactionPlugin contains information for a trigger to add reactions to a specific user's messages
 type UserReactionPlugin struct {
-	Name       string // Name of plugin
-	UserID     string // UserID of user the reactions will apply to
-	ReactionID string // ReactionID of the reaction that will be applied to the message
+	Name        string   // Name of plugin
+	UserIDs     []string // UserIDs of users the reactions will apply to
+	ReactionIDs []string // ReactionIDs of the reactions that will be applied to the message
 }
 
 // MessageReactionPlugin contains information for a trigger to add
 // reaction when a message contains a specific TriggerWord
 type MessageReactionPlugin struct {
-	Name        string
-	TriggerWord string
-	ReactionID  string
+	Name         string   // Name of plugin
+	TriggerWords []string // Words that will trigger the reactions being adde
+	ReactionIDs  []string // Reactions that will be added when triggered
 }
 
 // NewCommand is a helper method that creates a new CommandPlugin with
@@ -60,13 +60,13 @@ func NewTimedMessage(name string, cronString string, f func() interface{}) *Time
 
 // NewUserReaction is a helper method that creates a new UserReactionPlugin
 // with the required fields and returns the UserReactionPlugin
-func NewUserReaction(name string, userID string, reactionID string) *UserReactionPlugin {
-	return &UserReactionPlugin{Name: name, UserID: userID, ReactionID: reactionID}
+func NewUserReaction(name string, userIDs []string, reactionIDs []string) *UserReactionPlugin {
+	return &UserReactionPlugin{Name: name, UserIDs: userIDs, ReactionIDs: reactionIDs}
 }
 
 // NewMessageReaction is a helper method that creates a
 // MessageReactionPlugin with the required fields and returns the
 // MessageReactionPlugin
-func NewMessageReaction(name string, triggerWord string, reactionID string) *MessageReactionPlugin {
-	return &MessageReactionPlugin{Name: name, TriggerWord: triggerWord, ReactionID: reactionID}
+func NewMessageReaction(name string, triggerWords []string, reactionIDs []string) *MessageReactionPlugin {
+	return &MessageReactionPlugin{Name: name, TriggerWords: triggerWords, ReactionIDs: reactionIDs}
 }

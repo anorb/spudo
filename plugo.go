@@ -400,16 +400,24 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 
 func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
 	for _, plugin := range b.UserReactionPlugins {
-		if plugin.UserID == m.Author.ID {
-			b.addReaction(m, plugin.ReactionID)
+		for _, user := range plugin.UserIDs {
+			if user == m.Author.ID {
+				for _, reaction := range plugin.ReactionIDs {
+					b.addReaction(m, reaction)
+				}
+			}
 		}
 	}
 }
 
 func (b *Bot) handleMessageReaction(m *discordgo.MessageCreate) {
 	for _, plugin := range b.MessageReactionPlugins {
-		if strings.Contains(strings.ToLower(m.Content), strings.ToLower(plugin.TriggerWord)) {
-			b.addReaction(m, plugin.ReactionID)
+		for _, trigger := range plugin.TriggerWords {
+			if strings.Contains(strings.ToLower(m.Content), strings.ToLower(trigger)) {
+				for _, reaction := range plugin.ReactionIDs {
+					b.addReaction(m, reaction)
+				}
+			}
 		}
 	}
 }

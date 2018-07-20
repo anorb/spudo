@@ -4,5 +4,7 @@ import "gitlab.com/anorb/plugo/pluginhandler"
 
 // Register ...
 func Register() interface{} {
-	return pluginhandler.NewMessageReaction("messagereaction", "ok", "👌")
+	triggerWords := []string{"ok", "okay"}
+	reactions := []string{"👌"}
+	return pluginhandler.NewMessageReaction("messagereaction", triggerWords, reactions)
 }

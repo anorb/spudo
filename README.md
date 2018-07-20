@@ -68,8 +68,8 @@ Examples of the different kinds of plugins can be found [here](https://gitlab.co
 
 - [Return a string response to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/ping/ping.go)
 - [Return a Discord embed message to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/embed/embed.go)
-- [Add reaction to specific user's messages](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/userreaction/userreaction.go)
-- [Add reaction to a message containing a specific string](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/messagereaction/messagereaction.go)
+- [Add reactions to specific user's messages](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/userreaction/userreaction.go)
+- [Add reactions to a message containing specific strings](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/messagereaction/messagereaction.go)
 - [Send a message (string or embed) at specific time](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/fiveseconds/fiveseconds.go)
   - The second argument in this example uses [cron-style](https://en.wikipedia.org/wiki/Cron) strings to define when the messages should be sent
 - [Add multiple commands with a single plugin](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/multiplecommands/multiplecommands.go) (Adding multiple commands in this way works for all other types of commands as well)
