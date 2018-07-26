@@ -1,8 +1,8 @@
 package main
 
 import (
-	"gitlab.com/anorb/plugo/pluginhandler"
-	"gitlab.com/anorb/plugo/utils"
+	"gitlab.com/anorb/spudo/pluginhandler"
+	"gitlab.com/anorb/spudo/utils"
 )
 
 func embed(args []string) interface{} {

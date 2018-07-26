@@ -1,4 +1,4 @@
-package plugo
+package spudo
 
 import (
 	"testing"

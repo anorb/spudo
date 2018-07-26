@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"gitlab.com/anorb/plugo/pluginhandler"
+	"gitlab.com/anorb/spudo/pluginhandler"
 )
 
 func hello(args []string) interface{} {

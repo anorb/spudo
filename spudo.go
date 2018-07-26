@@ -1,4 +1,4 @@
-package plugo
+package spudo
 
 import (
 	"bufio"
@@ -17,9 +17,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/bwmarrin/discordgo"
 	"github.com/robfig/cron"
-	"gitlab.com/anorb/plugo/embed"
-	"gitlab.com/anorb/plugo/pluginhandler"
-	"gitlab.com/anorb/plugo/utils"
+	"gitlab.com/anorb/spudo/embed"
+	"gitlab.com/anorb/spudo/pluginhandler"
+	"gitlab.com/anorb/spudo/utils"
 )
 
 // Config contains all options for the config file

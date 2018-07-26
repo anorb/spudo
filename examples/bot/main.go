@@ -1,10 +1,10 @@
 package main
 
 import (
-	"gitlab.com/anorb/plugo"
+	"gitlab.com/anorb/spudo"
 )
 
 func main() {
-	bot := plugo.NewBot()
+	bot := spudo.NewBot()
 	bot.Start()
 }

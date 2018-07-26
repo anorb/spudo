@@ -1,5 +1,5 @@
-# PluGo
-PluGo helps build a Discord bot that utilizes [Go plugins](https://golang.org/pkg/plugin/) to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
+# Spudo
+Spudo helps build a Discord bot that utilizes [Go plugins](https://golang.org/pkg/plugin/) to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
 
 ## Creating a bot
 ### Create a config
@@ -28,11 +28,11 @@ PluginsDir="data/plugins"
 package main
 
 import (
-	"gitlab.com/anorb/plugo"
+	"gitlab.com/anorb/spudo"
 )
 
 func main() {
-	bot := plugo.NewBot()
+	bot := spudo.NewBot()
 	bot.Start()
 }
 ```
@@ -44,7 +44,7 @@ Examples can be found [here](./examples/bot).
 ```go
 package main
 
-import "gitlab.com/anorb/plugo/pluginhandler"
+import "gitlab.com/anorb/spudo/pluginhandler"
 
 func ping(args []string) interface{} {
 	return "pong!"
@@ -76,7 +76,7 @@ Examples of the different kinds of plugins can be found [here](./examples/plugin
 
 ### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
 
-Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow PluGo to convert it inside the bot and keep the plugin .so files ~1mb.
+Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow Spudo to convert it inside the bot and keep the plugin .so files ~1mb.
 
 ### What if I want to put the config.toml file somewhere else?
 ```sh
