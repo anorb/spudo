@@ -1,8 +1,8 @@
 package embed
 
 import (
+	"github.com/anorb/spudo/utils"
 	"github.com/bwmarrin/discordgo"
-	"gitlab.com/anorb/spudo/utils"
 )
 
 // Embed is a wrapper around *discordgo.MessageEmbed

@@ -28,7 +28,7 @@ PluginsDir="data/plugins"
 package main
 
 import (
-	"gitlab.com/anorb/spudo"
+	"github.com/anorb/spudo"
 )
 
 func main() {
@@ -44,7 +44,7 @@ Examples can be found [here](./examples/bot).
 ```go
 package main
 
-import "gitlab.com/anorb/spudo/pluginhandler"
+import "github.com/anorb/spudo/pluginhandler"
 
 func ping(args []string) interface{} {
 	return "pong!"

@@ -1,6 +1,6 @@
 package main
 
-import "gitlab.com/anorb/spudo/pluginhandler"
+import "github.com/anorb/spudo/pluginhandler"
 
 func ping(args []string) interface{} {
 	return "Pong!"

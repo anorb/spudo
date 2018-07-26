@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.com/anorb/spudo/pluginhandler"
+	"github.com/anorb/spudo/pluginhandler"
 )
 
 func timer() interface{} {

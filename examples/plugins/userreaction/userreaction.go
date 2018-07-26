@@ -1,6 +1,6 @@
 package main
 
-import "gitlab.com/anorb/spudo/pluginhandler"
+import "github.com/anorb/spudo/pluginhandler"
 
 // Register ...
 func Register() interface{} {

@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/anorb/spudo/embed"
+	"github.com/anorb/spudo/pluginhandler"
+	"github.com/anorb/spudo/utils"
 	"github.com/bwmarrin/discordgo"
 	"github.com/robfig/cron"
-	"gitlab.com/anorb/spudo/embed"
-	"gitlab.com/anorb/spudo/pluginhandler"
-	"gitlab.com/anorb/spudo/utils"
 )
 
 // Config contains all options for the config file

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.com/anorb/spudo"
+	"github.com/anorb/spudo"
 )
 
 func main() {
