@@ -37,7 +37,7 @@ func main() {
 }
 ```
 That's it. Everything else is handled through the plugin system.
-Examples can be found [here](https://gitlab.com/anorb/plugo/tree/master/examples/bot).
+Examples can be found [here](./examples/bot).
 
 ## Basic plugin
 ### Create the plugin
@@ -60,19 +60,19 @@ go build -buildmode=plugin ping.go
 ```
 ### Move ping.so to directory specified in your config
 
-Examples of the different kinds of plugins can be found [here](https://gitlab.com/anorb/plugo/tree/master/examples/plugins) along with a [small script](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/build.sh) to build plugins en masse.
+Examples of the different kinds of plugins can be found [here](./examples/plugins) along with a [small script](./examples/plugins/build.sh) to build plugins en masse.
 
 ## FAQ
 
 ### What kind of plugins can be made?
 
-- [Return a string response to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/ping/ping.go)
-- [Return a Discord embed message to a command](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/embed/embed.go)
-- [Add reactions to specific user's messages](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/userreaction/userreaction.go)
-- [Add reactions to a message containing specific strings](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/messagereaction/messagereaction.go)
-- [Send a message (string or embed) at specific time](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/fiveseconds/fiveseconds.go)
+- [Return a string response to a command](./examples/plugins/ping/ping.go)
+- [Return a Discord embed message to a command](./examples/plugins/embed/embed.go)
+- [Add reactions to specific user's messages](./examples/plugins/userreaction/userreaction.go)
+- [Add reactions to a message containing specific strings](./examples/plugins/messagereaction/messagereaction.go)
+- [Send a message (string or embed) at specific time](./examples/plugins/fiveseconds/fiveseconds.go)
   - The second argument in this example uses [cron-style](https://en.wikipedia.org/wiki/Cron) strings to define when the messages should be sent
-- [Add multiple commands with a single plugin](https://gitlab.com/anorb/plugo/blob/master/examples/plugins/multiplecommands/multiplecommands.go) (Adding multiple commands in this way works for all other types of commands as well)
+- [Add multiple commands with a single plugin](./examples/plugins/multiplecommands/multiplecommands.go) (Adding multiple commands in this way works for all other types of commands as well)
 
 ### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
 
