@@ -228,8 +228,8 @@ func (b *Bot) addMessageReactionPlugin(plugin *pluginhandler.MessageReactionPlug
 	fmt.Printf("%s plugin registered as a message reaction\n", plugin.Name)
 }
 
-// Start will add handler function to the Session and open the
-// websocket connection.
+// Start will add handler functions to the Session and open the
+// websocket connection then listen for commands at the CLI
 func (b *Bot) Start() {
 	configPath := flag.String("config", "./config.toml", "TODO")
 	flag.Parse()
@@ -266,15 +266,43 @@ func (b *Bot) Start() {
 
 	fmt.Println("Bot is now running. Press CTRL-C to exit.")
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-c
+	// Make goroutine to handle listening for interrupt signals
+	// and then move on
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+		<-c
+		b.quit()
+	}()
 
+	// Handle command being sent from the CLI
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("> ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Error reading command input - " + err.Error())
+			continue
+		}
+		// Convert CRLF to LF
+		input = strings.Replace(input, "\n", "", -1)
+		if strings.HasPrefix(input, "send ") {
+			toSend := strings.TrimPrefix(input, "send ")
+			b.sendMessage(b.Config.DefaultChannelID, toSend)
+		}
+		if strings.Compare("quit", input) == 0 || strings.Compare("exit", input) == 0 {
+			b.quit()
+		}
+	}
+}
+
+// quit handles everything that needs to occur for the bot to shutdown cleanly.
+func (b *Bot) quit() {
 	fmt.Println("Bot is now shutting down.")
-
 	if err := b.Session.Close(); err != nil {
 		log.Fatal("Error closing discord session" + err.Error())
 	}
+	os.Exit(1)
 }
 
 func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
