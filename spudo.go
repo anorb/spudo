@@ -8,16 +8,11 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"plugin"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/anorb/spudo/embed"
-	"github.com/anorb/spudo/pluginhandler"
-	"github.com/anorb/spudo/utils"
 	"github.com/bwmarrin/discordgo"
 	"github.com/robfig/cron"
 )
@@ -31,19 +26,56 @@ type Config struct {
 	WelcomeBackMessage    string
 	CooldownMessage       string
 	UnknownCommandMessage string
-	PluginsDir            string
 }
 
 // Bot contains everything about the bot itself
 type Bot struct {
-	Session                *discordgo.Session
-	Config                 Config
-	CommandPlugins         map[string]*pluginhandler.CommandPlugin
-	TimedMessagePlugins    []*pluginhandler.TimedMessagePlugin
-	UserReactionPlugins    []*pluginhandler.UserReactionPlugin
-	MessageReactionPlugins []*pluginhandler.MessageReactionPlugin
-	CooldownList           map[string]time.Time
-	TimersStarted          bool
+	Session       *discordgo.Session
+	Config        Config
+	CooldownList  map[string]time.Time
+	TimersStarted bool
+}
+
+var (
+	commandPlugins         = make(map[string]*commandPlugin)
+	timedMessagePlugins    = make([]*timedMessagePlugin, 0)
+	userReactionPlugins    = make([]*userReactionPlugin, 0)
+	messageReactionPlugins = make([]*messageReactionPlugin, 0)
+)
+
+func AddCommandPlugin(command, description string, exec func(args []string) interface{}) {
+	commandPlugins[command] = &commandPlugin{
+		Name:        command,
+		Description: description,
+		Exec:        exec,
+	}
+}
+
+func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
+	p := &timedMessagePlugin{
+		Name:       name,
+		CronString: cronString,
+		Exec:       exec,
+	}
+	timedMessagePlugins = append(timedMessagePlugins, p)
+}
+
+func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
+	p := &userReactionPlugin{
+		Name:        name,
+		UserIDs:     userIDs,
+		ReactionIDs: reactionIDs,
+	}
+	userReactionPlugins = append(userReactionPlugins, p)
+}
+
+func AddMessageReactionPlugins(name string, triggerWords, reactionIDs []string) {
+	p := &messageReactionPlugin{
+		Name:         name,
+		TriggerWords: triggerWords,
+		ReactionIDs:  reactionIDs,
+	}
+	messageReactionPlugins = append(messageReactionPlugins, p)
 }
 
 // NewBot will create a new Bot and return it. It will also load
@@ -51,10 +83,6 @@ type Bot struct {
 func NewBot() *Bot {
 	bot := &Bot{}
 	bot.CooldownList = make(map[string]time.Time)
-	bot.CommandPlugins = make(map[string]*pluginhandler.CommandPlugin)
-	bot.TimedMessagePlugins = make([]*pluginhandler.TimedMessagePlugin, 0)
-	bot.UserReactionPlugins = make([]*pluginhandler.UserReactionPlugin, 0)
-	bot.MessageReactionPlugins = make([]*pluginhandler.MessageReactionPlugin, 0)
 	return bot
 }
 
@@ -78,7 +106,6 @@ func getDefaultConfig() Config {
 		CooldownMessage:       "Too many commands at once!",
 		WelcomeBackMessage:    "I'm back!",
 		UnknownCommandMessage: "Invalid command!",
-		PluginsDir:            "plugins",
 	}
 }
 
@@ -91,7 +118,7 @@ func (b *Bot) createMinimalConfig() error {
 	path := "./config.toml"
 
 	var err error
-	b.Config.Token, err = getInput("Eneter token: ")
+	b.Config.Token, err = getInput("Enter token: ")
 	if err != nil {
 		return err
 	}
@@ -143,91 +170,6 @@ func (b *Bot) createSession() error {
 	return nil
 }
 
-// loadPlugins gets all the plugins (any .so file in the pluginsDir)
-// and looks for the Register function then executes it. It then adds
-// the plugin to the applicable map or slice.
-func (b *Bot) loadPlugins() error {
-	if _, err := os.Stat(b.Config.PluginsDir); os.IsNotExist(err) {
-		return fmt.Errorf("Error reading the plugin directory - %v", err)
-	}
-
-	pluginFiles, err := filepath.Glob(fmt.Sprintf("%s/*.so", b.Config.PluginsDir))
-	if err != nil {
-		return fmt.Errorf("Globbing pattern malformed - %v", err)
-	}
-
-	for _, filename := range pluginFiles {
-		p, err := plugin.Open(filename)
-		if err != nil {
-			fmt.Printf("Error opening plugin, ignoring: %s - %s\n", filename, err)
-			continue
-		}
-
-		reg, err := p.Lookup("Register")
-		if err != nil {
-			fmt.Println("Register function not found in plugin, ignoring: " + filename)
-			continue
-		}
-
-		registerPlugin, ok := reg.(func() interface{})
-		if !ok {
-			fmt.Println("Error with plugin Register function, ignoring: " + filename)
-			continue
-		}
-		c := registerPlugin()
-
-		switch v := c.(type) {
-		case *pluginhandler.CommandPlugin:
-			b.addCommandPlugin(v)
-		case *pluginhandler.TimedMessagePlugin:
-			b.addTimedMessagePlugin(v)
-		case *pluginhandler.UserReactionPlugin:
-			b.addUserReactionPlugin(v)
-		case *pluginhandler.MessageReactionPlugin:
-			b.addMessageReactionPlugin(v)
-		case []*pluginhandler.CommandPlugin:
-			for _, p := range v {
-				b.addCommandPlugin(p)
-			}
-		case []*pluginhandler.TimedMessagePlugin:
-			for _, p := range v {
-				b.addTimedMessagePlugin(p)
-			}
-		case []*pluginhandler.UserReactionPlugin:
-			for _, p := range v {
-				b.addUserReactionPlugin(p)
-			}
-		case []*pluginhandler.MessageReactionPlugin:
-			for _, p := range v {
-				b.addMessageReactionPlugin(p)
-			}
-		default:
-			fmt.Printf("Failed to load plugin: %s - Unknown plugin type\n", filename)
-		}
-	}
-	return nil
-}
-
-func (b *Bot) addCommandPlugin(plugin *pluginhandler.CommandPlugin) {
-	b.CommandPlugins[strings.ToLower(plugin.Name)] = plugin
-	fmt.Printf("%s plugin registered as a command\n", plugin.Name)
-}
-
-func (b *Bot) addTimedMessagePlugin(plugin *pluginhandler.TimedMessagePlugin) {
-	b.TimedMessagePlugins = append(b.TimedMessagePlugins, plugin)
-	fmt.Printf("%s plugin registered as a timed message\n", plugin.Name)
-}
-
-func (b *Bot) addUserReactionPlugin(plugin *pluginhandler.UserReactionPlugin) {
-	b.UserReactionPlugins = append(b.UserReactionPlugins, plugin)
-	fmt.Printf("%s plugin registered as a user reaction\n", plugin.Name)
-}
-
-func (b *Bot) addMessageReactionPlugin(plugin *pluginhandler.MessageReactionPlugin) {
-	b.MessageReactionPlugins = append(b.MessageReactionPlugins, plugin)
-	fmt.Printf("%s plugin registered as a message reaction\n", plugin.Name)
-}
-
 // Start will add handler functions to the Session and open the
 // websocket connection
 func (b *Bot) Start() {
@@ -250,10 +192,6 @@ func (b *Bot) Start() {
 	}
 
 	if err := b.createSession(); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := b.loadPlugins(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -354,7 +292,7 @@ func (b *Bot) addReaction(m *discordgo.MessageCreate, reactionID string) {
 // map. If it is, it will return the command response as resp and
 // whether or not the message should be sent privately as private.
 func (b *Bot) attemptCommand(comStr string, args []string) (resp interface{}, private bool) {
-	if com, isValid := b.CommandPlugins[comStr]; isValid {
+	if com, isValid := commandPlugins[comStr]; isValid {
 		resp = com.Exec(args)
 		private = com.PrivateResponse
 		return
@@ -389,13 +327,11 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 			b.respondToUser(m, v)
 		}
 		b.startCooldown(m.Author.ID)
-	case *utils.Embed:
-		e := embed.Convert(v)
-
+	case *Embed:
 		if isPrivate {
-			b.sendPrivateMessage(m.Author.ID, e.MessageEmbed)
+			b.sendPrivateMessage(m.Author.ID, v.MessageEmbed)
 		} else {
-			b.sendEmbed(m.ChannelID, e.MessageEmbed)
+			b.sendEmbed(m.ChannelID, v.MessageEmbed)
 		}
 		b.startCooldown(m.Author.ID)
 	default:
@@ -404,7 +340,7 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
-	for _, plugin := range b.UserReactionPlugins {
+	for _, plugin := range userReactionPlugins {
 		for _, user := range plugin.UserIDs {
 			if user == m.Author.ID {
 				for _, reaction := range plugin.ReactionIDs {
@@ -416,7 +352,7 @@ func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
 }
 
 func (b *Bot) handleMessageReaction(m *discordgo.MessageCreate) {
-	for _, plugin := range b.MessageReactionPlugins {
+	for _, plugin := range messageReactionPlugins {
 		for _, trigger := range plugin.TriggerWords {
 			if strings.Contains(strings.ToLower(m.Content), strings.ToLower(trigger)) {
 				for _, reaction := range plugin.ReactionIDs {
@@ -442,7 +378,7 @@ func (b *Bot) startCooldown(user string) {
 
 // Starts all TimedMessagePlugins.
 func (b *Bot) startTimedMessages() {
-	for _, p := range b.TimedMessagePlugins {
+	for _, p := range timedMessagePlugins {
 
 		c := cron.NewWithLocation(time.UTC)
 		timerFunc := p.Exec()
@@ -451,9 +387,8 @@ func (b *Bot) startTimedMessages() {
 			switch v := timerFunc.(type) {
 			case string:
 				b.sendMessage(b.Config.DefaultChannelID, v)
-			case *utils.Embed:
-				e := embed.Convert(v)
-				b.sendEmbed(b.Config.DefaultChannelID, e.MessageEmbed)
+			case *Embed:
+				b.sendEmbed(b.Config.DefaultChannelID, v.MessageEmbed)
 			}
 		}); err != nil {
 			log.Println("Error starting time message - " + p.Name + ": " + err.Error())

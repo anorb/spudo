@@ -18,11 +18,3 @@ func TestCreateSession(t *testing.T) {
 		t.Errorf("Error creating session - %s", err.Error())
 	}
 }
-
-func TestLoadPlugins(t *testing.T) {
-	bot := NewBot()
-	bot.Config.PluginsDir = "./examples/plugins"
-	if err := bot.loadPlugins(); err != nil {
-		t.Errorf("Error loading plugins - %s", err.Error())
-	}
-}

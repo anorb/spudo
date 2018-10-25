@@ -1,12 +1,13 @@
-package main
+package ping
 
-import "github.com/anorb/spudo/pluginhandler"
+import (
+	"github.com/anorb/spudo"
+)
 
 func ping(args []string) interface{} {
 	return "Pong!"
 }
 
-// Register ...
-func Register() interface{} {
-	return pluginhandler.NewCommand("ping", ping).SetDescription("Responds to !ping with pong")
+func init() {
+	spudo.AddCommandPlugin("ping", "responds with pong", ping)
 }

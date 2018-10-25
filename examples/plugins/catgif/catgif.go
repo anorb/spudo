@@ -1,11 +1,10 @@
-package main
+package catgif
 
 import (
 	"fmt"
 	"net/http"
 
-	"github.com/anorb/spudo/pluginhandler"
-	"github.com/anorb/spudo/utils"
+	"github.com/anorb/spudo"
 )
 
 func catgif(args []string) interface{} {
@@ -15,10 +14,9 @@ func catgif(args []string) interface{} {
 		return ""
 	}
 
-	return utils.NewEmbed().SetColor(0x808080).SetImage(res.Request.URL.String())
+	return spudo.NewEmbed().SetColor(0x808080).SetImage(res.Request.URL.String())
 }
 
-// Register ...
-func Register() interface{} {
-	return pluginhandler.NewCommand("catgif", catgif)
+func init() {
+	spudo.AddCommandPlugin("catgif", "gets random cat gif", catgif)
 }

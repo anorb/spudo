@@ -1,14 +1,11 @@
-package main
+package fiveseconds
 
-import (
-	"github.com/anorb/spudo/pluginhandler"
-)
+import "github.com/anorb/spudo"
 
 func timer() interface{} {
 	return "Five seconds have elapsed"
 }
 
-// Register ...
-func Register() interface{} {
-	return pluginhandler.NewTimedMessage("five seconds", "0,5,10,15,20,25,30,35,40,45,50,55 * * * * *", timer)
+func init() {
+	spudo.AddTimedMessagePlugin("five seconds", "0,5,10,15,20,25,30,35,40,45,50,55 * * * * *", timer)
 }

@@ -1,4 +1,8 @@
-package utils
+package spudo
+
+import (
+	"github.com/bwmarrin/discordgo"
+)
 
 const (
 	embedLimitTitle       = 256
@@ -10,56 +14,14 @@ const (
 	embedLimitAuthor      = 256
 )
 
-// Embed ...
+// Embed is a wrapper around *discordgo.MessageEmbed
 type Embed struct {
-	Title       string
-	Description string
-	Fields      []*EmbedField
-	Footer      *EmbedFooter
-	Image       *EmbedImage
-	Thumbnail   *EmbedThumbnail
-	Author      *EmbedAuthor
-	URL         string
-	Color       int
-}
-
-// EmbedField ...
-type EmbedField struct {
-	Name   string
-	Value  string
-	Inline bool
-}
-
-// EmbedFooter ...
-type EmbedFooter struct {
-	IconURL      string
-	Text         string
-	ProxyIconURL string
-}
-
-// EmbedImage ...
-type EmbedImage struct {
-	URL      string
-	ProxyURL string
-}
-
-// EmbedThumbnail ...
-type EmbedThumbnail struct {
-	URL      string
-	ProxyURL string
-}
-
-// EmbedAuthor ...
-type EmbedAuthor struct {
-	Name         string
-	IconURL      string
-	URL          string
-	ProxyIconURL string
+	*discordgo.MessageEmbed
 }
 
 // NewEmbed returns a new Embed with no fields set
 func NewEmbed() *Embed {
-	return &Embed{}
+	return &Embed{&discordgo.MessageEmbed{}}
 }
 
 // SetTitle sets the Embed's Title to title. Will truncate title if it
@@ -68,6 +30,7 @@ func (e *Embed) SetTitle(title string) *Embed {
 	if len(title) > embedLimitTitle {
 		title = title[:embedLimitTitle]
 	}
+
 	e.Title = title
 	return e
 }
@@ -78,30 +41,30 @@ func (e *Embed) SetDescription(description string) *Embed {
 	if len(description) > embedLimitDescription {
 		description = description[:embedLimitDescription]
 	}
+
 	e.Description = description
 	return e
 }
 
 // AddField creates an EmbedField with name and value and adds it to
 // to the Embed's Fields slice. If the embed has too many items in
-// Field, it will simply return the Embed as is. The value and name
+// Fields, it will simply return the Embed as is. The value and name
 // will be truncated if they are too long. Returns the modified Embed.
-func (e *Embed) AddField(name, value string) *Embed {
+func (e *Embed) AddField(name, value string, inline bool) *Embed {
 	if len(e.Fields) > embedLimitField {
 		return e
 	}
-
 	if len(value) > embedLimitFieldName {
 		value = value[:embedLimitFieldName]
 	}
-
 	if len(name) > embedLimitFieldValue {
 		name = name[:embedLimitFieldValue]
 	}
 
-	e.Fields = append(e.Fields, &EmbedField{
-		Name:  name,
-		Value: value,
+	e.Fields = append(e.Fields, &discordgo.MessageEmbedField{
+		Name:   name,
+		Value:  value,
+		Inline: inline,
 	})
 	return e
 }
@@ -128,11 +91,7 @@ func (e *Embed) SetFooter(args ...string) *Embed {
 		proxyURL = args[2]
 	}
 
-	if len(text) > embedLimitFooter {
-		text = text[:embedLimitFooter]
-	}
-
-	e.Footer = &EmbedFooter{
+	e.Footer = &discordgo.MessageEmbedFooter{
 		IconURL:      iconURL,
 		Text:         text,
 		ProxyIconURL: proxyURL,
@@ -157,7 +116,7 @@ func (e *Embed) SetImage(args ...string) *Embed {
 		proxyURL = args[1]
 	}
 
-	e.Image = &EmbedImage{
+	e.Image = &discordgo.MessageEmbedImage{
 		URL:      URL,
 		ProxyURL: proxyURL,
 	}
@@ -181,7 +140,7 @@ func (e *Embed) SetThumbnail(args ...string) *Embed {
 		proxyURL = args[1]
 	}
 
-	e.Thumbnail = &EmbedThumbnail{
+	e.Thumbnail = &discordgo.MessageEmbedThumbnail{
 		URL:      URL,
 		ProxyURL: proxyURL,
 	}
@@ -215,17 +174,13 @@ func (e *Embed) SetAuthor(args ...string) *Embed {
 	if len(args) > 3 {
 		proxyURL = args[3]
 	}
-	if len(name) > embedLimitAuthor {
-		name = name[:embedLimitAuthor]
-	}
 
-	e.Author = &EmbedAuthor{
+	e.Author = &discordgo.MessageEmbedAuthor{
 		Name:         name,
 		IconURL:      iconURL,
 		URL:          URL,
 		ProxyIconURL: proxyURL,
 	}
-
 	return e
 }
 

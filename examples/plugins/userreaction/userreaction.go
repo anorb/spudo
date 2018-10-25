@@ -1,10 +1,7 @@
-package main
+package userreaction
 
-import "github.com/anorb/spudo/pluginhandler"
+import "github.com/anorb/spudo"
 
-// Register ...
-func Register() interface{} {
-	userIDs := []string{"351684465131886746541"}
-	reactions := []string{"👍", "☝"}
-	return pluginhandler.NewUserReaction("userreaction", userIDs, reactions)
+func init() {
+	spudo.AddUserReactionPlugin("userreaction", []string{"56418947165489476"}, []string{"👌"})
 }

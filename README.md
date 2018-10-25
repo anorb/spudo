@@ -1,5 +1,5 @@
 # Spudo
-Spudo helps build a Discord bot that utilizes [Go plugins](https://golang.org/pkg/plugin/) to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
+Spudo helps build a Discord bot that utilizes plugins to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
 
 ## Creating a bot
 ### Create a config
@@ -20,8 +20,6 @@ CooldownMessage="You have used too many commands"
 WelcomeBackMessage="I'm back"
 # Message that will be sent when a user issues an invalid command (Optional, default: Invalid command!)
 UnknownCommandMessage="Command is invalid"
-# Directory where the .so plugins will be stored (Optional, default: plugins)
-PluginsDir="data/plugins"
 ```
 ### Create bot
 ```go
@@ -29,6 +27,8 @@ package main
 
 import (
 	"github.com/anorb/spudo"
+	_ "github.com/anorb/spudo/examples/plugins/hello"
+	_ "github.com/anorb/spudo/examples/plugins/ping"
 )
 
 func main() {
@@ -36,31 +36,31 @@ func main() {
 	bot.Start()
 }
 ```
-That's it. Everything else is handled through the plugin system.
-Examples can be found [here](./examples/bot).
+That's it. Plugins are imported and added to the bot. Everything else is handled through the plugin system.
+Example can be found [here](./examples/bot).
 
 ## Basic plugin
 ### Create the plugin
 ```go
-package main
+package ping
 
-import "github.com/anorb/spudo/pluginhandler"
+import (
+	"github.com/anorb/spudo"
+)
 
 func ping(args []string) interface{} {
-	return "pong!"
+	return "Pong!"
 }
 
-func Register() interface{} {
-	return pluginhandler.NewCommand("ping", ping).SetDescription("Returns ping on !pong command")
+func init() {
+	spudo.AddCommandPlugin("ping", "responds with pong", ping)
 }
 ```
-### Build the plugin
-```sh
-go build -buildmode=plugin ping.go
+### Import plugin to bot with underscore
+```go
+_ "github.com/anorb/spudo/examples/plugins/ping"
 ```
-### Move ping.so to directory specified in your config
-
-Examples of the different kinds of plugins can be found [here](./examples/plugins) along with a [small script](./examples/plugins/build.sh) to build plugins en masse.
+Examples of the different kinds of plugins can be found [here](./examples/plugins).
 
 ## FAQ
 
@@ -72,11 +72,6 @@ Examples of the different kinds of plugins can be found [here](./examples/plugin
 - [Add reactions to a message containing specific strings](./examples/plugins/messagereaction/messagereaction.go)
 - [Send a message (string or embed) at specific time](./examples/plugins/fiveseconds/fiveseconds.go)
   - The second argument in this example uses [cron-style](https://en.wikipedia.org/wiki/Cron) strings to define when the messages should be sent
-- [Add multiple commands with a single plugin](./examples/plugins/multiplecommands/multiplecommands.go) (Adding multiple commands in this way works for all other types of commands as well)
-
-### Why are there two embed.go files (embed/embed.go) and (utils/embed.go)?
-
-Due to the plugins being statically compiled, if I only had embed/embed.go it would require the plugin to be 10mb+ as it would pull in discordgo since Embed struct acts as a wrapper around discordgo.MessageEmbed. For the plugins, use utils/embed.go which has limited dependencies and allow Spudo to convert it inside the bot and keep the plugin .so files ~1mb.
 
 ### What if I want to put the config.toml file somewhere else?
 ```sh

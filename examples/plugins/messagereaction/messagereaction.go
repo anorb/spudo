@@ -1,10 +1,7 @@
-package main
+package messagereaction
 
-import "github.com/anorb/spudo/pluginhandler"
+import "github.com/anorb/spudo"
 
-// Register ...
-func Register() interface{} {
-	triggerWords := []string{"ok", "okay"}
-	reactions := []string{"👌"}
-	return pluginhandler.NewMessageReaction("messagereaction", triggerWords, reactions)
+func init() {
+	spudo.AddMessageReactionPlugins("reacts to ok", []string{"ok"}, []string{"👌"})
 }

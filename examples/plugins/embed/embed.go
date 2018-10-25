@@ -1,15 +1,13 @@
-package main
+package embed
 
 import (
-	"github.com/anorb/spudo/pluginhandler"
-	"github.com/anorb/spudo/utils"
+	"github.com/anorb/spudo"
 )
 
 func embed(args []string) interface{} {
-	return utils.NewEmbed().SetTitle("This is an embed").AddField("First", "field").AddField("Seconds", "field").SetAuthor("Author name", "https://i.imgur.com/Oa5DbkC.png").SetImage("https://i.imgur.com/Oa5DbkC.png")
+	return spudo.NewEmbed().SetTitle("This is a test").SetDescription("This is also a test")
 }
 
-// Register ...
-func Register() interface{} {
-	return pluginhandler.NewCommand("embed", embed)
+func init() {
+	spudo.AddCommandPlugin("embed", "test embed command", embed)
 }
