@@ -43,6 +43,7 @@ var (
 	messageReactionPlugins = make([]*messageReactionPlugin, 0)
 )
 
+// AddCommandPlugin will add a regular command to the plugin map.
 func AddCommandPlugin(command, description string, exec func(args []string) interface{}) {
 	commandPlugins[command] = &commandPlugin{
 		Name:        command,
@@ -51,6 +52,8 @@ func AddCommandPlugin(command, description string, exec func(args []string) inte
 	}
 }
 
+// AddTimedMessagePlugin will add a plugin that sends a message at
+// specific times.
 func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
 	p := &timedMessagePlugin{
 		Name:       name,
@@ -60,6 +63,8 @@ func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
 	timedMessagePlugins = append(timedMessagePlugins, p)
 }
 
+// AddUserReactionPlugin will add a plugin that reacts to all user IDs
+// with the reaction IDs.
 func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
 	p := &userReactionPlugin{
 		Name:        name,
@@ -69,7 +74,9 @@ func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
 	userReactionPlugins = append(userReactionPlugins, p)
 }
 
-func AddMessageReactionPlugins(name string, triggerWords, reactionIDs []string) {
+// AddMessageReactionPlugin will add a plugin that reacts to all
+// trigger words with the reaction IDs.
+func AddMessageReactionPlugin(name string, triggerWords, reactionIDs []string) {
 	p := &messageReactionPlugin{
 		Name:         name,
 		TriggerWords: triggerWords,
