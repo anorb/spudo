@@ -50,6 +50,7 @@ func AddCommandPlugin(command, description string, exec func(args []string) inte
 		Description: description,
 		Exec:        exec,
 	}
+	fmt.Println("Command plugin added:", command)
 }
 
 // AddTimedMessagePlugin will add a plugin that sends a message at
@@ -61,6 +62,7 @@ func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
 		Exec:       exec,
 	}
 	timedMessagePlugins = append(timedMessagePlugins, p)
+	fmt.Println("Timed message plugin added:", name)
 }
 
 // AddUserReactionPlugin will add a plugin that reacts to all user IDs
@@ -72,6 +74,7 @@ func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
 		ReactionIDs: reactionIDs,
 	}
 	userReactionPlugins = append(userReactionPlugins, p)
+	fmt.Println("User reaction plugin added:", name)
 }
 
 // AddMessageReactionPlugin will add a plugin that reacts to all
@@ -83,6 +86,7 @@ func AddMessageReactionPlugin(name string, triggerWords, reactionIDs []string) {
 		ReactionIDs:  reactionIDs,
 	}
 	messageReactionPlugins = append(messageReactionPlugins, p)
+	fmt.Println("Message reaction plugin added:", name)
 }
 
 // NewBot will create a new Bot and return it. It will also load
