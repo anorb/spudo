@@ -388,9 +388,9 @@ func (b *Bot) startTimedMessages() {
 	for _, p := range timedMessagePlugins {
 
 		c := cron.NewWithLocation(time.UTC)
-		timerFunc := p.Exec()
 
 		if err := c.AddFunc(p.CronString, func() {
+			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
 				b.sendMessage(b.Config.DefaultChannelID, v)
