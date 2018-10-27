@@ -2,9 +2,9 @@ package spudo
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -41,6 +41,7 @@ var (
 	timedMessagePlugins    = make([]*timedMessagePlugin, 0)
 	userReactionPlugins    = make([]*userReactionPlugin, 0)
 	messageReactionPlugins = make([]*messageReactionPlugin, 0)
+	logger                 = newLogger()
 )
 
 // AddCommandPlugin will add a regular command to the plugin map.
@@ -50,7 +51,7 @@ func AddCommandPlugin(command, description string, exec func(args []string) inte
 		Description: description,
 		Exec:        exec,
 	}
-	fmt.Println("Command plugin added:", command)
+	logger.info("Command plugin added:", command)
 }
 
 // AddTimedMessagePlugin will add a plugin that sends a message at
@@ -62,7 +63,7 @@ func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
 		Exec:       exec,
 	}
 	timedMessagePlugins = append(timedMessagePlugins, p)
-	fmt.Println("Timed message plugin added:", name)
+	logger.info("Timed message plugin added:", name)
 }
 
 // AddUserReactionPlugin will add a plugin that reacts to all user IDs
@@ -74,7 +75,7 @@ func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
 		ReactionIDs: reactionIDs,
 	}
 	userReactionPlugins = append(userReactionPlugins, p)
-	fmt.Println("User reaction plugin added:", name)
+	logger.info("User reaction plugin added:", name)
 }
 
 // AddMessageReactionPlugin will add a plugin that reacts to all
@@ -86,7 +87,7 @@ func AddMessageReactionPlugin(name string, triggerWords, reactionIDs []string) {
 		ReactionIDs:  reactionIDs,
 	}
 	messageReactionPlugins = append(messageReactionPlugins, p)
-	fmt.Println("Message reaction plugin added:", name)
+	logger.info("Message reaction plugin added:", name)
 }
 
 // NewBot will create a new Bot and return it. It will also load
@@ -157,16 +158,15 @@ func (b *Bot) loadConfig(configPath string) error {
 	b.Config = getDefaultConfig()
 
 	if _, err := toml.DecodeFile(configPath, &b.Config); err != nil {
-		return fmt.Errorf("Error reading config - %v", err.Error())
+		return errors.New("Failed to read config - " + err.Error())
 	}
 
 	if b.Config.Token == "" {
-		return fmt.Errorf("Error: No Token set in config")
+		return errors.New("No token in config")
 	}
 
 	if b.Config.DefaultChannelID == "" {
-		log.Println("WARNING: No DefaultChannelID set in config")
-		log.Println("Welcome back message and timed messages will not be sent")
+		logger.info("No DefaultChannelID set in config - Welcome back message and timed messages will not be sent")
 	}
 
 	return nil
@@ -175,7 +175,7 @@ func (b *Bot) loadConfig(configPath string) error {
 func (b *Bot) createSession() error {
 	session, err := discordgo.New("Bot " + b.Config.Token)
 	if err != nil {
-		return fmt.Errorf("Error creating Discord session - %v", err.Error())
+		return errors.New("Error creating Discord session - " + err.Error())
 	}
 	b.Session = session
 	return nil
@@ -192,28 +192,28 @@ func (b *Bot) Start() {
 	// Check if config exists, if it doesn't use
 	// createMinimalConfig to generate one.
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
-		fmt.Println("Config not detected, attempting to create...")
+		logger.info("Config not detected, attempting to create...")
 		if err := b.createMinimalConfig(); err != nil {
-			log.Fatal(err)
+			logger.fatal("Failed to create minimal config", err)
 		}
 	}
 
 	if err := b.loadConfig(*configPath); err != nil {
-		log.Fatal(err)
+		logger.fatal(err.Error())
 	}
 
 	if err := b.createSession(); err != nil {
-		log.Fatal(err)
+		logger.fatal(err.Error())
 	}
 
 	b.Session.AddHandler(b.onReady)
 	b.Session.AddHandler(b.onMessageCreate)
 
 	if err := b.Session.Open(); err != nil {
-		log.Fatal("Error opening websocket connection - " + err.Error())
+		logger.fatal("Error opening websocket connection -", err)
 	}
 
-	fmt.Println("Bot is now running. Press CTRL-C to exit.")
+	logger.info("Bot is now running. Press CTRL-C to exit.")
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
@@ -224,9 +224,9 @@ func (b *Bot) Start() {
 
 // quit handles everything that needs to occur for the bot to shutdown cleanly.
 func (b *Bot) quit() {
-	fmt.Println("Bot is now shutting down.")
+	logger.info("Bot is now shutting down")
 	if err := b.Session.Close(); err != nil {
-		log.Fatal("Error closing discord session" + err.Error())
+		logger.fatal("Error closing discord session", err)
 	}
 	os.Exit(1)
 }
@@ -256,7 +256,7 @@ func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) 
 func (b *Bot) sendMessage(channelID string, message string) {
 	_, err := b.Session.ChannelMessageSend(channelID, message)
 	if err != nil {
-		log.Println("Failed to send message response - " + err.Error())
+		logger.error("Failed to send message response -", err)
 	}
 }
 
@@ -265,7 +265,7 @@ func (b *Bot) sendMessage(channelID string, message string) {
 func (b *Bot) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
 	_, err := b.Session.ChannelMessageSendEmbed(channelID, embed)
 	if err != nil {
-		log.Println("Failed to send embed message response - " + err.Error())
+		logger.error("Failed to send embed message response -", err)
 	}
 }
 
@@ -274,7 +274,7 @@ func (b *Bot) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
 func (b *Bot) sendPrivateMessage(userID string, message interface{}) {
 	privChannel, err := b.Session.UserChannelCreate(userID)
 	if err != nil {
-		log.Println("Error creating private channel - " + err.Error())
+		logger.error("Error creating private channel -", err)
 		return
 	}
 	switch v := message.(type) {
@@ -295,7 +295,7 @@ func (b *Bot) respondToUser(m *discordgo.MessageCreate, response string) {
 // discordgo. It adds a reaction to a given message.
 func (b *Bot) addReaction(m *discordgo.MessageCreate, reactionID string) {
 	if err := b.Session.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
-		log.Println("Error adding reaction - " + err.Error())
+		logger.error("Error adding reaction -", err)
 	}
 }
 
@@ -402,7 +402,7 @@ func (b *Bot) startTimedMessages() {
 				b.sendEmbed(b.Config.DefaultChannelID, v.MessageEmbed)
 			}
 		}); err != nil {
-			log.Println("Error starting time message - " + p.Name + ": " + err.Error())
+			logger.error("Error starting "+p.Name+" timed message - ", err)
 			continue
 		}
 		c.Start()
