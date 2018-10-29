@@ -28,74 +28,30 @@ type Config struct {
 	UnknownCommandMessage string
 }
 
-// Bot contains everything about the bot itself
-type Bot struct {
+// Spudo contains everything about the bot itself
+type Spudo struct {
 	Session       *discordgo.Session
 	Config        Config
 	CooldownList  map[string]time.Time
 	TimersStarted bool
+	logger        *spudoLogger
+
+	commands         map[string]*command
+	timedMessages    []*timedMessage
+	userReactions    []*userReaction
+	messageReactions []*messageReaction
 }
 
-var (
-	commandPlugins         = make(map[string]*commandPlugin)
-	timedMessagePlugins    = make([]*timedMessagePlugin, 0)
-	userReactionPlugins    = make([]*userReactionPlugin, 0)
-	messageReactionPlugins = make([]*messageReactionPlugin, 0)
-	logger                 = newLogger()
-)
-
-// AddCommandPlugin will add a regular command to the plugin map.
-func AddCommandPlugin(command, description string, exec func(args []string) interface{}) {
-	commandPlugins[command] = &commandPlugin{
-		Name:        command,
-		Description: description,
-		Exec:        exec,
-	}
-	logger.info("Command plugin added:", command)
-}
-
-// AddTimedMessagePlugin will add a plugin that sends a message at
-// specific times.
-func AddTimedMessagePlugin(name, cronString string, exec func() interface{}) {
-	p := &timedMessagePlugin{
-		Name:       name,
-		CronString: cronString,
-		Exec:       exec,
-	}
-	timedMessagePlugins = append(timedMessagePlugins, p)
-	logger.info("Timed message plugin added:", name)
-}
-
-// AddUserReactionPlugin will add a plugin that reacts to all user IDs
-// with the reaction IDs.
-func AddUserReactionPlugin(name string, userIDs, reactionIDs []string) {
-	p := &userReactionPlugin{
-		Name:        name,
-		UserIDs:     userIDs,
-		ReactionIDs: reactionIDs,
-	}
-	userReactionPlugins = append(userReactionPlugins, p)
-	logger.info("User reaction plugin added:", name)
-}
-
-// AddMessageReactionPlugin will add a plugin that reacts to all
-// trigger words with the reaction IDs.
-func AddMessageReactionPlugin(name string, triggerWords, reactionIDs []string) {
-	p := &messageReactionPlugin{
-		Name:         name,
-		TriggerWords: triggerWords,
-		ReactionIDs:  reactionIDs,
-	}
-	messageReactionPlugins = append(messageReactionPlugins, p)
-	logger.info("Message reaction plugin added:", name)
-}
-
-// NewBot will create a new Bot and return it. It will also load
-// Config and all plugins that are currently available.
-func NewBot() *Bot {
-	bot := &Bot{}
-	bot.CooldownList = make(map[string]time.Time)
-	return bot
+// NewSpudo will initialize everything Spudo needs to run.
+func NewSpudo() *Spudo {
+	sp := &Spudo{}
+	sp.CooldownList = make(map[string]time.Time)
+	sp.logger = newLogger()
+	sp.commands = make(map[string]*command)
+	sp.timedMessages = make([]*timedMessage, 0)
+	sp.userReactions = make([]*userReaction, 0)
+	sp.messageReactions = make([]*messageReaction, 0)
+	return sp
 }
 
 // Ask user for input using prompt and returns the entry and any
@@ -124,18 +80,18 @@ func getDefaultConfig() Config {
 // createMinimalConfig prompts the user to enter a Token and
 // DefaultChannelID for the Config. This is used if no config is
 // found.
-func (b *Bot) createMinimalConfig() error {
+func (sp *Spudo) createMinimalConfig() error {
 	// Set default config
-	b.Config = getDefaultConfig()
+	sp.Config = getDefaultConfig()
 	path := "./config.toml"
 
 	var err error
-	b.Config.Token, err = getInput("Enter token: ")
+	sp.Config.Token, err = getInput("Enter token: ")
 	if err != nil {
 		return err
 	}
 
-	b.Config.DefaultChannelID, err = getInput("Enter default channel ID: ")
+	sp.Config.DefaultChannelID, err = getInput("Enter default channel ID: ")
 	if err != nil {
 		return err
 	}
@@ -146,44 +102,44 @@ func (b *Bot) createMinimalConfig() error {
 	}
 	defer f.Close()
 
-	err = toml.NewEncoder(f).Encode(b.Config)
+	err = toml.NewEncoder(f).Encode(sp.Config)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *Bot) loadConfig(configPath string) error {
+func (sp *Spudo) loadConfig(configPath string) error {
 	// Set default config
-	b.Config = getDefaultConfig()
+	sp.Config = getDefaultConfig()
 
-	if _, err := toml.DecodeFile(configPath, &b.Config); err != nil {
+	if _, err := toml.DecodeFile(configPath, &sp.Config); err != nil {
 		return errors.New("Failed to read config - " + err.Error())
 	}
 
-	if b.Config.Token == "" {
+	if sp.Config.Token == "" {
 		return errors.New("No token in config")
 	}
 
-	if b.Config.DefaultChannelID == "" {
-		logger.info("No DefaultChannelID set in config - Welcome back message and timed messages will not be sent")
+	if sp.Config.DefaultChannelID == "" {
+		sp.logger.info("No DefaultChannelID set in config - Welcome back message and timed messages will not be sent")
 	}
 
 	return nil
 }
 
-func (b *Bot) createSession() error {
-	session, err := discordgo.New("Bot " + b.Config.Token)
+func (sp *Spudo) createSession() error {
+	session, err := discordgo.New("Bot " + sp.Config.Token)
 	if err != nil {
 		return errors.New("Error creating Discord session - " + err.Error())
 	}
-	b.Session = session
+	sp.Session = session
 	return nil
 }
 
 // Start will add handler functions to the Session and open the
 // websocket connection
-func (b *Bot) Start() {
+func (sp *Spudo) Start() {
 	configPath := flag.String("config", "./config.toml", "TODO")
 	flag.Parse()
 
@@ -192,118 +148,118 @@ func (b *Bot) Start() {
 	// Check if config exists, if it doesn't use
 	// createMinimalConfig to generate one.
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
-		logger.info("Config not detected, attempting to create...")
-		if err := b.createMinimalConfig(); err != nil {
-			logger.fatal("Failed to create minimal config", err)
+		sp.logger.info("Config not detected, attempting to create...")
+		if err := sp.createMinimalConfig(); err != nil {
+			sp.logger.fatal("Failed to create minimal config", err)
 		}
 	}
 
-	if err := b.loadConfig(*configPath); err != nil {
-		logger.fatal(err.Error())
+	if err := sp.loadConfig(*configPath); err != nil {
+		sp.logger.fatal(err.Error())
 	}
 
-	if err := b.createSession(); err != nil {
-		logger.fatal(err.Error())
+	if err := sp.createSession(); err != nil {
+		sp.logger.fatal(err.Error())
 	}
 
-	b.Session.AddHandler(b.onReady)
-	b.Session.AddHandler(b.onMessageCreate)
+	sp.Session.AddHandler(sp.onReady)
+	sp.Session.AddHandler(sp.onMessageCreate)
 
-	if err := b.Session.Open(); err != nil {
-		logger.fatal("Error opening websocket connection -", err)
+	if err := sp.Session.Open(); err != nil {
+		sp.logger.fatal("Error opening websocket connection -", err)
 	}
 
-	logger.info("Bot is now running. Press CTRL-C to exit.")
+	sp.logger.info("Bot is now running. Press CTRL-C to exit.")
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-c
 
-	b.quit()
+	sp.quit()
 }
 
 // quit handles everything that needs to occur for the bot to shutdown cleanly.
-func (b *Bot) quit() {
-	logger.info("Bot is now shutting down")
-	if err := b.Session.Close(); err != nil {
-		logger.fatal("Error closing discord session", err)
+func (sp *Spudo) quit() {
+	sp.logger.info("Bot is now shutting down")
+	if err := sp.Session.Close(); err != nil {
+		sp.logger.fatal("Error closing discord session", err)
 	}
 	os.Exit(1)
 }
 
-func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
-	if b.Config.WelcomeBackMessage != "" && b.Config.DefaultChannelID != "" {
-		b.sendMessage(b.Config.DefaultChannelID, b.Config.WelcomeBackMessage)
+func (sp *Spudo) onReady(s *discordgo.Session, r *discordgo.Ready) {
+	if sp.Config.WelcomeBackMessage != "" && sp.Config.DefaultChannelID != "" {
+		sp.sendMessage(sp.Config.DefaultChannelID, sp.Config.WelcomeBackMessage)
 	}
-	if !b.TimersStarted && b.Config.DefaultChannelID != "" {
-		b.startTimedMessages()
+	if !sp.TimersStarted && sp.Config.DefaultChannelID != "" {
+		sp.startTimedMessages()
 	}
 }
 
-func (b *Bot) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (sp *Spudo) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Always ignore bot users (including itself)
 	if m.Author.Bot {
 		return
 	}
 
-	go b.handleCommand(m)
-	go b.handleUserReaction(m)
-	go b.handleMessageReaction(m)
+	go sp.handleCommand(m)
+	go sp.handleUserReaction(m)
+	go sp.handleMessageReaction(m)
 }
 
 // sendMessage is a helper function around ChannelMessageSend from
 // discordgo. It will send a message to a given channel.
-func (b *Bot) sendMessage(channelID string, message string) {
-	_, err := b.Session.ChannelMessageSend(channelID, message)
+func (sp *Spudo) sendMessage(channelID string, message string) {
+	_, err := sp.Session.ChannelMessageSend(channelID, message)
 	if err != nil {
-		logger.error("Failed to send message response -", err)
+		sp.logger.error("Failed to send message response -", err)
 	}
 }
 
 // sendEmbed is a helper function around ChannelMessageSendEmbed from
 // discordgo. It will send an embed message to a given channel.
-func (b *Bot) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
-	_, err := b.Session.ChannelMessageSendEmbed(channelID, embed)
+func (sp *Spudo) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
+	_, err := sp.Session.ChannelMessageSendEmbed(channelID, embed)
 	if err != nil {
-		logger.error("Failed to send embed message response -", err)
+		sp.logger.error("Failed to send embed message response -", err)
 	}
 }
 
 // sendPrivateMessage creates a UserChannel before attempting to send
 // a message directly to a user rather than in the server channel.
-func (b *Bot) sendPrivateMessage(userID string, message interface{}) {
-	privChannel, err := b.Session.UserChannelCreate(userID)
+func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
+	privChannel, err := sp.Session.UserChannelCreate(userID)
 	if err != nil {
-		logger.error("Error creating private channel -", err)
+		sp.logger.error("Error creating private channel -", err)
 		return
 	}
 	switch v := message.(type) {
 	case string:
-		b.sendMessage(privChannel.ID, v)
+		sp.sendMessage(privChannel.ID, v)
 	case *discordgo.MessageEmbed:
-		b.sendEmbed(privChannel.ID, v)
+		sp.sendEmbed(privChannel.ID, v)
 	}
 }
 
 // respondToUser is a helper method around sendMessage that will
 // mention the user who created the message.
-func (b *Bot) respondToUser(m *discordgo.MessageCreate, response string) {
-	b.sendMessage(m.ChannelID, fmt.Sprintf("%s", m.Author.Mention()+" "+response))
+func (sp *Spudo) respondToUser(m *discordgo.MessageCreate, response string) {
+	sp.sendMessage(m.ChannelID, fmt.Sprintf("%s", m.Author.Mention()+" "+response))
 }
 
 // addReaction is a helper method around MessageReactionAdd from
 // discordgo. It adds a reaction to a given message.
-func (b *Bot) addReaction(m *discordgo.MessageCreate, reactionID string) {
-	if err := b.Session.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
-		logger.error("Error adding reaction -", err)
+func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
+	if err := sp.Session.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
+		sp.logger.error("Error adding reaction -", err)
 	}
 }
 
-// attemptCommand will check if comStr is in the CommandPlugins
-// map. If it is, it will return the command response as resp and
-// whether or not the message should be sent privately as private.
-func (b *Bot) attemptCommand(comStr string, args []string) (resp interface{}, private bool) {
-	if com, isValid := commandPlugins[comStr]; isValid {
+// attemptCommand will check if comStr is in the commands map. If it
+// is, it will return the command response as resp and whether or not
+// the message should be sent privately as private.
+func (sp *Spudo) attemptCommand(comStr string, args []string) (resp interface{}, private bool) {
+	if com, isValid := sp.commands[comStr]; isValid {
 		resp = com.Exec(args)
 		private = com.PrivateResponse
 		return
@@ -311,16 +267,16 @@ func (b *Bot) attemptCommand(comStr string, args []string) (resp interface{}, pr
 	return
 }
 
-func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
-	if !strings.HasPrefix(m.Content, b.Config.CommandPrefix) {
+func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
+	if !strings.HasPrefix(m.Content, sp.Config.CommandPrefix) {
 		return
 	}
-	if !b.canPost(m.Author.ID) {
-		b.respondToUser(m, b.Config.CooldownMessage)
+	if !sp.canPost(m.Author.ID) {
+		sp.respondToUser(m, sp.Config.CooldownMessage)
 		return
 	}
 
-	commandText := strings.Split(strings.TrimPrefix(m.Content, b.Config.CommandPrefix), " ")
+	commandText := strings.Split(strings.TrimPrefix(m.Content, sp.Config.CommandPrefix), " ")
 
 	for i, text := range commandText {
 		commandText[i] = strings.ToLower(text)
@@ -328,46 +284,46 @@ func (b *Bot) handleCommand(m *discordgo.MessageCreate) {
 
 	com := commandText[0]
 	args := commandText[1:len(commandText)]
-	commandResp, isPrivate := b.attemptCommand(com, args)
+	commandResp, isPrivate := sp.attemptCommand(com, args)
 
 	switch v := commandResp.(type) {
 	case string:
 		if isPrivate {
-			b.sendPrivateMessage(m.Author.ID, v)
+			sp.sendPrivateMessage(m.Author.ID, v)
 		} else {
-			b.respondToUser(m, v)
+			sp.respondToUser(m, v)
 		}
-		b.startCooldown(m.Author.ID)
+		sp.startCooldown(m.Author.ID)
 	case *Embed:
 		if isPrivate {
-			b.sendPrivateMessage(m.Author.ID, v.MessageEmbed)
+			sp.sendPrivateMessage(m.Author.ID, v.MessageEmbed)
 		} else {
-			b.sendEmbed(m.ChannelID, v.MessageEmbed)
+			sp.sendEmbed(m.ChannelID, v.MessageEmbed)
 		}
-		b.startCooldown(m.Author.ID)
+		sp.startCooldown(m.Author.ID)
 	default:
-		b.respondToUser(m, b.Config.UnknownCommandMessage)
+		sp.respondToUser(m, sp.Config.UnknownCommandMessage)
 	}
 }
 
-func (b *Bot) handleUserReaction(m *discordgo.MessageCreate) {
-	for _, plugin := range userReactionPlugins {
-		for _, user := range plugin.UserIDs {
+func (sp *Spudo) handleUserReaction(m *discordgo.MessageCreate) {
+	for _, ur := range sp.userReactions {
+		for _, user := range ur.UserIDs {
 			if user == m.Author.ID {
-				for _, reaction := range plugin.ReactionIDs {
-					b.addReaction(m, reaction)
+				for _, reaction := range ur.ReactionIDs {
+					sp.addReaction(m, reaction)
 				}
 			}
 		}
 	}
 }
 
-func (b *Bot) handleMessageReaction(m *discordgo.MessageCreate) {
-	for _, plugin := range messageReactionPlugins {
-		for _, trigger := range plugin.TriggerWords {
+func (sp *Spudo) handleMessageReaction(m *discordgo.MessageCreate) {
+	for _, mr := range sp.messageReactions {
+		for _, trigger := range mr.TriggerWords {
 			if strings.Contains(strings.ToLower(m.Content), strings.ToLower(trigger)) {
-				for _, reaction := range plugin.ReactionIDs {
-					b.addReaction(m, reaction)
+				for _, reaction := range mr.ReactionIDs {
+					sp.addReaction(m, reaction)
 				}
 			}
 		}
@@ -375,21 +331,21 @@ func (b *Bot) handleMessageReaction(m *discordgo.MessageCreate) {
 }
 
 // Returns whether or not the user can issue a command based on a timer.
-func (b *Bot) canPost(user string) bool {
-	if userTime, isValid := b.CooldownList[user]; isValid {
-		return time.Since(userTime).Seconds() > float64(b.Config.CooldownTimer)
+func (sp *Spudo) canPost(user string) bool {
+	if userTime, isValid := sp.CooldownList[user]; isValid {
+		return time.Since(userTime).Seconds() > float64(sp.Config.CooldownTimer)
 	}
 	return true
 }
 
 // Adds user to cooldown list.
-func (b *Bot) startCooldown(user string) {
-	b.CooldownList[user] = time.Now()
+func (sp *Spudo) startCooldown(user string) {
+	sp.CooldownList[user] = time.Now()
 }
 
-// Starts all TimedMessagePlugins.
-func (b *Bot) startTimedMessages() {
-	for _, p := range timedMessagePlugins {
+// Starts all TimedMessages.
+func (sp *Spudo) startTimedMessages() {
+	for _, p := range sp.timedMessages {
 
 		c := cron.NewWithLocation(time.UTC)
 
@@ -397,16 +353,16 @@ func (b *Bot) startTimedMessages() {
 			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
-				b.sendMessage(b.Config.DefaultChannelID, v)
+				sp.sendMessage(sp.Config.DefaultChannelID, v)
 			case *Embed:
-				b.sendEmbed(b.Config.DefaultChannelID, v.MessageEmbed)
+				sp.sendEmbed(sp.Config.DefaultChannelID, v.MessageEmbed)
 			}
 		}); err != nil {
-			logger.error("Error starting "+p.Name+" timed message - ", err)
+			sp.logger.error("Error starting "+p.Name+" timed message - ", err)
 			continue
 		}
 		c.Start()
 	}
 
-	b.TimersStarted = true
+	sp.TimersStarted = true
 }

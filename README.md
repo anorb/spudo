@@ -1,7 +1,7 @@
 # Spudo
-Spudo helps build a Discord bot that utilizes plugins to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
+Spudo helps build a Discord bot that is easily extensible to add functionality. Built using [DiscordGo](https://github.com/bwmarrin/discordgo).
 
-## Creating a bot
+## Basic usage
 ### Create a config
 The config uses the [TOML](https://github.com/toml-lang/toml) format. If you don't make one, you will be prompted to and the default settings will be used.
 ```toml
@@ -26,52 +26,35 @@ UnknownCommandMessage="Command is invalid"
 package main
 
 import (
+	"fmt"
+
 	"github.com/anorb/spudo"
-	_ "github.com/anorb/spudo/examples/plugins/hello"
-	_ "github.com/anorb/spudo/examples/plugins/ping"
 )
 
 func main() {
-	bot := spudo.NewBot()
+	bot := spudo.NewSpudo()
+	bot.AddCommand("ping", "responds with pong", ping)
 	bot.Start()
 }
-```
-That's it. Plugins are imported and added to the bot. Everything else is handled through the plugin system.
-Example can be found [here](./examples/bot).
-
-## Basic plugin
-### Create the plugin
-```go
-package ping
-
-import (
-	"github.com/anorb/spudo"
-)
 
 func ping(args []string) interface{} {
 	return "Pong!"
 }
-
-func init() {
-	spudo.AddCommandPlugin("ping", "responds with pong", ping)
-}
 ```
-### Import plugin to bot with underscore
-```go
-_ "github.com/anorb/spudo/examples/plugins/ping"
-```
-Examples of the different kinds of plugins can be found [here](./examples/plugins).
+Further examples can be found [here](./examples/bot/main.go).
 
 ## FAQ
 
 ### What kind of plugins can be made?
 
-- [Return a string response to a command](./examples/plugins/ping/ping.go)
-- [Return a Discord embed message to a command](./examples/plugins/embed/embed.go)
-- [Add reactions to specific user's messages](./examples/plugins/userreaction/userreaction.go)
-- [Add reactions to a message containing specific strings](./examples/plugins/messagereaction/messagereaction.go)
-- [Send a message (string or embed) at specific time](./examples/plugins/fiveseconds/fiveseconds.go)
+- Return a string response to a command
+- Return a Discord embed message to a command
+- Add reactions to specific user's messages
+- Add reactions to a message containing specific strings
+- Send a message (string or embed) at specific time
   - The second argument in this example uses [cron-style](https://en.wikipedia.org/wiki/Cron) strings to define when the messages should be sent
+
+All of these are demonstrated [here](./examples/bot/main.go).
 
 ### What if I want to put the config.toml file somewhere else?
 ```sh

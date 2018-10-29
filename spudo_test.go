@@ -5,14 +5,14 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	bot := NewBot()
+	bot := NewSpudo()
 	if err := bot.loadConfig("./examples/bot/config.toml"); err != nil {
 		t.Errorf("Error loading config - %s", err.Error())
 	}
 }
 
 func TestCreateSession(t *testing.T) {
-	bot := NewBot()
+	bot := NewSpudo()
 	bot.Config.Token = "test"
 	if err := bot.createSession(); err != nil {
 		t.Errorf("Error creating session - %s", err.Error())

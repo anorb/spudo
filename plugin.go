@@ -1,26 +1,26 @@
 package spudo
 
-type commandPlugin struct {
-	Name            string                          // Name of command
+type command struct {
+	Name            string                          // Name of the command
 	Exec            func(args []string) interface{} // Function that will be executed when command is used
 	Description     string                          // Description of command for a help command to use
 	PrivateResponse bool                            // Indicates whether or not the command will yield a private message response
 }
 
-type timedMessagePlugin struct {
+type timedMessage struct {
 	Name       string             // Name of the timed message
 	CronString string             // Cron-style string to determine when the Exec function is executed
-	Exec       func() interface{} // Function that will be executed based on the CronString
+	Exec       func() interface{} // Function that will be executed
 }
 
-type userReactionPlugin struct {
-	Name        string   // Name of plugin
+type userReaction struct {
+	Name        string   // Name of the user reaction
 	UserIDs     []string // UserIDs of users the reactions will apply to
 	ReactionIDs []string // ReactionIDs of the reactions that will be applied to the message
 }
 
-type messageReactionPlugin struct {
-	Name         string   // Name of plugin
-	TriggerWords []string // Words that will trigger the reactions being adde
+type messageReaction struct {
+	Name         string   // Name of the message reaction
+	TriggerWords []string // Words that will trigger the reactions being added
 	ReactionIDs  []string // Reactions that will be added when triggered
 }

@@ -1,17 +1,38 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/anorb/spudo"
-	_ "github.com/anorb/spudo/examples/plugins/catgif"
-	_ "github.com/anorb/spudo/examples/plugins/embed"
-	_ "github.com/anorb/spudo/examples/plugins/fiveseconds"
-	_ "github.com/anorb/spudo/examples/plugins/hello"
-	_ "github.com/anorb/spudo/examples/plugins/messagereaction"
-	_ "github.com/anorb/spudo/examples/plugins/ping"
-	_ "github.com/anorb/spudo/examples/plugins/userreaction"
 )
 
 func main() {
-	bot := spudo.NewBot()
+	bot := spudo.NewSpudo()
+	bot.AddCommand("embed", "test embed command", embed)
+	bot.AddCommand("hello", "says hello + whatever argument follows", hello)
+	bot.AddCommand("ping", "responds with pong", ping)
+
+	bot.AddTimedMessage("five seconds", "0,5,10,15,20,25,30,35,40,45,50,55 * * * * *", timer)
+
+	bot.AddMessageReaction("reacts to ok", []string{"ok"}, []string{"👌"})
+
+	bot.AddUserReaction("userreaction", []string{"56418947165489476"}, []string{"👌"})
+
 	bot.Start()
+}
+
+func embed(args []string) interface{} {
+	return spudo.NewEmbed().SetTitle("This is a test").SetDescription("This is also a test")
+}
+
+func hello(args []string) interface{} {
+	return fmt.Sprintf("Hello %s", args[0])
+}
+
+func ping(args []string) interface{} {
+	return "Pong!"
+}
+
+func timer() interface{} {
+	return "Five seconds have elapsed"
 }
