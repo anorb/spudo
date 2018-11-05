@@ -26,6 +26,7 @@ type Config struct {
 	WelcomeBackMessage    string
 	CooldownMessage       string
 	UnknownCommandMessage string
+	AudioEnabled          bool
 }
 
 // Spudo contains everything about the bot itself
@@ -36,10 +37,17 @@ type Spudo struct {
 	TimersStarted bool
 	logger        *spudoLogger
 
+	spudoCommands map[string]*spudoCommand
+
 	commands         map[string]*command
 	timedMessages    []*timedMessage
 	userReactions    []*userReaction
 	messageReactions []*messageReaction
+
+	Voice        *discordgo.VoiceConnection
+	audioQueue   []*ytAudio
+	audioControl chan int
+	audioPlaying bool
 }
 
 // NewSpudo will initialize everything Spudo needs to run.
@@ -51,6 +59,8 @@ func NewSpudo() *Spudo {
 	sp.timedMessages = make([]*timedMessage, 0)
 	sp.userReactions = make([]*userReaction, 0)
 	sp.messageReactions = make([]*messageReaction, 0)
+
+	sp.spudoCommands = make(map[string]*spudoCommand)
 	return sp
 }
 
@@ -162,6 +172,12 @@ func (sp *Spudo) Start() {
 		sp.logger.fatal(err.Error())
 	}
 
+	if sp.Config.AudioEnabled {
+		sp.addAudioCommands()
+		sp.audioControl = make(chan int)
+		sp.logger.info("Audio commands added")
+	}
+
 	sp.Session.AddHandler(sp.onReady)
 	sp.Session.AddHandler(sp.onMessageCreate)
 
@@ -181,8 +197,13 @@ func (sp *Spudo) Start() {
 // quit handles everything that needs to occur for the bot to shutdown cleanly.
 func (sp *Spudo) quit() {
 	sp.logger.info("Bot is now shutting down")
+	if sp.Voice != nil {
+		if err := sp.Voice.Disconnect(); err != nil {
+			sp.logger.fatal("Error disconnecting from voice channel:", err)
+		}
+	}
 	if err := sp.Session.Close(); err != nil {
-		sp.logger.fatal("Error closing discord session", err)
+		sp.logger.fatal("Error closing discord session:", err)
 	}
 	os.Exit(1)
 }
@@ -258,7 +279,13 @@ func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
 // attemptCommand will check if comStr is in the commands map. If it
 // is, it will return the command response as resp and whether or not
 // the message should be sent privately as private.
-func (sp *Spudo) attemptCommand(comStr string, args []string) (resp interface{}, private bool) {
+func (sp *Spudo) attemptCommand(author, comStr string, args []string) (resp interface{}, private bool) {
+	if com, isValid := sp.spudoCommands[comStr]; isValid {
+		resp = com.Exec(author, args...)
+		private = com.PrivateResponse
+		return
+	}
+
 	if com, isValid := sp.commands[comStr]; isValid {
 		resp = com.Exec(args)
 		private = com.PrivateResponse
@@ -278,13 +305,10 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 
 	commandText := strings.Split(strings.TrimPrefix(m.Content, sp.Config.CommandPrefix), " ")
 
-	for i, text := range commandText {
-		commandText[i] = strings.ToLower(text)
-	}
-
-	com := commandText[0]
+	com := strings.ToLower(commandText[0])
 	args := commandText[1:len(commandText)]
-	commandResp, isPrivate := sp.attemptCommand(com, args)
+
+	commandResp, isPrivate := sp.attemptCommand(m.Author.ID, com, args)
 
 	switch v := commandResp.(type) {
 	case string:
@@ -301,6 +325,8 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 			sp.sendEmbed(m.ChannelID, v.MessageEmbed)
 		}
 		sp.startCooldown(m.Author.ID)
+	case voiceCommand:
+		sp.sendMessage(m.ChannelID, string(v))
 	default:
 		sp.respondToUser(m, sp.Config.UnknownCommandMessage)
 	}

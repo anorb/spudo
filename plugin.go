@@ -24,3 +24,10 @@ type messageReaction struct {
 	TriggerWords []string // Words that will trigger the reactions being added
 	ReactionIDs  []string // Reactions that will be added when triggered
 }
+
+type spudoCommand struct {
+	Name            string                                          // Name of the command
+	Exec            func(author string, args ...string) interface{} // Function that will be executed when command is used
+	Description     string                                          // Description of command for a help command to use
+	PrivateResponse bool                                            // Indicates whether or not the command will yield a private message response
+}
