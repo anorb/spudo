@@ -17,6 +17,7 @@ const (
 	audioSkip
 	audioPause
 	audioResume
+	audioStop
 )
 
 type voiceCommand string
@@ -45,13 +46,8 @@ func (sp *Spudo) addAudioCommands() {
 	}
 	sp.spudoCommands["pause"] = &spudoCommand{
 		Name:        "pause",
-		Description: "pause audio",
-		Exec:        sp.pauseAudio,
-	}
-	sp.spudoCommands["resume"] = &spudoCommand{
-		Name:        "resume",
-		Description: "resume audio",
-		Exec:        sp.resumeAudio,
+		Description: "pause/unpause audio",
+		Exec:        sp.togglePause,
 	}
 	sp.spudoCommands["skip"] = &spudoCommand{
 		Name:        "skip",
@@ -81,7 +77,7 @@ func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} 
 		return voiceCommand("can't leave, not connected")
 	}
 
-	sp.audioPlaying = false
+	sp.audioStatus = audioStop
 
 	err := sp.Voice.Disconnect()
 	if err != nil {
@@ -101,7 +97,7 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 		return voiceCommand("play requires a link argument")
 	}
 
-	if sp.audioPlaying {
+	if sp.audioStatus == audioPlay || sp.audioStatus == audioPause {
 		return sp.queueAudio(args[0], channel)
 	}
 
@@ -110,24 +106,20 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 	return voiceCommand(pn)
 }
 
-func (sp *Spudo) pauseAudio(author, channel string, args ...string) interface{} {
-	if !sp.audioPlaying {
-		return voiceCommand("can't pause, no audio playing")
+func (sp *Spudo) togglePause(author, channel string, args ...string) interface{} {
+	var vc voiceCommand
+	if sp.audioStatus == audioPause {
+		sp.audioControl <- audioResume
+		vc = voiceCommand("resuming audio")
+	} else if sp.audioStatus == audioPlay {
+		sp.audioControl <- audioPause
+		vc = voiceCommand("pausing audio")
 	}
-	sp.audioControl <- audioPause
-	return voiceCommand("pausing audio")
-}
-
-func (sp *Spudo) resumeAudio(author, channel string, args ...string) interface{} {
-	if !sp.audioPlaying {
-		return voiceCommand("can't resume, no audio playing")
-	}
-	sp.audioControl <- audioResume
-	return voiceCommand("resuming audio")
+	return vc
 }
 
 func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
-	if !sp.audioPlaying {
+	if sp.audioStatus != audioPlay {
 		return voiceCommand("can't skip, no audio playing")
 	}
 	sp.audioControl <- audioSkip
@@ -190,7 +182,7 @@ func (sp *Spudo) startAudio(a *ytAudio) {
 		return
 	}
 
-	sp.audioPlaying = true
+	sp.audioStatus = audioPlay
 
 	options := dca.StdEncodeOptions
 	options.RawOutput = true
@@ -213,8 +205,10 @@ AudioLoop:
 		case cmd := <-sp.audioControl:
 			switch cmd {
 			case audioPause:
+				sp.audioStatus = audioPause
 				stream.SetPaused(true)
 			case audioResume:
+				sp.audioStatus = audioPlay
 				stream.SetPaused(false)
 			case audioSkip:
 				stream.SetPaused(true)
@@ -222,7 +216,7 @@ AudioLoop:
 					pn, ch := sp.playNext()
 					sp.sendMessage(ch, pn)
 				} else {
-					sp.audioPlaying = false
+					sp.audioStatus = audioStop
 					err = sp.Voice.Speaking(false)
 					if err != nil {
 						sp.logger.error("Failed to end speaking: ", err)
@@ -243,7 +237,7 @@ AudioLoop:
 				pn, ch := sp.playNext()
 				sp.sendMessage(ch, pn)
 			} else {
-				sp.audioPlaying = false
+				sp.audioStatus = audioStop
 				err = sp.Voice.Speaking(false)
 				if err != nil {
 					sp.logger.error("Failed to end speaking: ", err)

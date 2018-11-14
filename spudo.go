@@ -47,7 +47,7 @@ type Spudo struct {
 	Voice        *discordgo.VoiceConnection
 	audioQueue   []*ytAudio
 	audioControl chan int
-	audioPlaying bool
+	audioStatus  int
 }
 
 // NewSpudo will initialize everything Spudo needs to run.
@@ -175,6 +175,7 @@ func (sp *Spudo) Start() {
 	if sp.Config.AudioEnabled {
 		sp.addAudioCommands()
 		sp.audioControl = make(chan int)
+		sp.audioStatus = audioStop
 		sp.logger.info("Audio commands added")
 	}
 
