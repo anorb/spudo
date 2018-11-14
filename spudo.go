@@ -279,9 +279,9 @@ func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
 // attemptCommand will check if comStr is in the commands map. If it
 // is, it will return the command response as resp and whether or not
 // the message should be sent privately as private.
-func (sp *Spudo) attemptCommand(author, comStr string, args []string) (resp interface{}, private bool) {
+func (sp *Spudo) attemptCommand(author, channel, comStr string, args []string) (resp interface{}, private bool) {
 	if com, isValid := sp.spudoCommands[comStr]; isValid {
-		resp = com.Exec(author, args...)
+		resp = com.Exec(author, channel, args...)
 		private = com.PrivateResponse
 		return
 	}
@@ -308,7 +308,7 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 	com := strings.ToLower(commandText[0])
 	args := commandText[1:len(commandText)]
 
-	commandResp, isPrivate := sp.attemptCommand(m.Author.ID, com, args)
+	commandResp, isPrivate := sp.attemptCommand(m.Author.ID, m.ChannelID, com, args)
 
 	switch v := commandResp.(type) {
 	case string:

@@ -23,7 +23,8 @@ type voiceCommand string
 
 type ytAudio struct {
 	*ytdl.VideoInfo
-	dlURL *url.URL
+	dlURL       *url.URL
+	sendChannel string
 }
 
 func (sp *Spudo) addAudioCommands() {
@@ -42,11 +43,6 @@ func (sp *Spudo) addAudioCommands() {
 		Description: "play next in queue",
 		Exec:        sp.playAudio,
 	}
-	sp.spudoCommands["queue"] = &spudoCommand{
-		Name:        "queue",
-		Description: "queue audio",
-		Exec:        sp.queueAudio,
-	}
 	sp.spudoCommands["pause"] = &spudoCommand{
 		Name:        "pause",
 		Description: "pause audio",
@@ -64,7 +60,7 @@ func (sp *Spudo) addAudioCommands() {
 	}
 }
 
-func (sp *Spudo) joinVoice(author string, args ...string) interface{} {
+func (sp *Spudo) joinVoice(author, channel string, args ...string) interface{} {
 	var err error
 
 	if sp.Voice != nil {
@@ -80,7 +76,7 @@ func (sp *Spudo) joinVoice(author string, args ...string) interface{} {
 	return voiceCommand("joined voice channel")
 }
 
-func (sp *Spudo) leaveVoice(author string, args ...string) interface{} {
+func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} {
 	if sp.Voice == nil {
 		return voiceCommand("can't leave, not connected")
 	}
@@ -96,24 +92,25 @@ func (sp *Spudo) leaveVoice(author string, args ...string) interface{} {
 	return voiceCommand("left voice chat")
 }
 
-func (sp *Spudo) playAudio(author string, args ...string) interface{} {
+func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 	if sp.Voice == nil {
 		return voiceCommand("unable to play, not in channel")
 	}
 
+	if len(args) < 1 {
+		return voiceCommand("play requires a link argument")
+	}
+
 	if sp.audioPlaying {
-		return voiceCommand("already playing")
+		return sp.queueAudio(args[0], channel)
 	}
 
-	if len(sp.audioQueue) <= 0 {
-		return voiceCommand("nothing in queue")
-	}
-
-	sp.playNext()
-	return voiceCommand("playing audio")
+	sp.queueAudio(args[0], channel)
+	pn, _ := sp.playNext()
+	return voiceCommand(pn)
 }
 
-func (sp *Spudo) pauseAudio(author string, args ...string) interface{} {
+func (sp *Spudo) pauseAudio(author, channel string, args ...string) interface{} {
 	if !sp.audioPlaying {
 		return voiceCommand("can't pause, no audio playing")
 	}
@@ -121,7 +118,7 @@ func (sp *Spudo) pauseAudio(author string, args ...string) interface{} {
 	return voiceCommand("pausing audio")
 }
 
-func (sp *Spudo) resumeAudio(author string, args ...string) interface{} {
+func (sp *Spudo) resumeAudio(author, channel string, args ...string) interface{} {
 	if !sp.audioPlaying {
 		return voiceCommand("can't resume, no audio playing")
 	}
@@ -129,7 +126,7 @@ func (sp *Spudo) resumeAudio(author string, args ...string) interface{} {
 	return voiceCommand("resuming audio")
 }
 
-func (sp *Spudo) skipAudio(author string, args ...string) interface{} {
+func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
 	if !sp.audioPlaying {
 		return voiceCommand("can't skip, no audio playing")
 	}
@@ -137,15 +134,18 @@ func (sp *Spudo) skipAudio(author string, args ...string) interface{} {
 	return voiceCommand("skipping current audio")
 }
 
-func (sp *Spudo) playNext() {
+func (sp *Spudo) playNext() (string, string) {
+	nowPlaying := "now playing `" + sp.audioQueue[0].Title + "`"
+	ch := sp.audioQueue[0].sendChannel
 	go sp.startAudio(sp.audioQueue[0])
 	sp.audioQueue = append(sp.audioQueue[:0], sp.audioQueue[0+1:]...)
+	return nowPlaying, ch
 }
 
-func (sp *Spudo) queueAudio(author string, args ...string) interface{} {
+func (sp *Spudo) queueAudio(audioLink, channel string) voiceCommand {
 	a := new(ytAudio)
 	var err error
-	a.VideoInfo, err = ytdl.GetVideoInfo(args[0])
+	a.VideoInfo, err = ytdl.GetVideoInfo(audioLink)
 	if err != nil {
 		sp.logger.error("Error getting video info: ", err)
 		return voiceCommand("failed to add item to queue")
@@ -158,6 +158,7 @@ func (sp *Spudo) queueAudio(author string, args ...string) interface{} {
 		return voiceCommand("failed to add item to queue")
 	}
 
+	a.sendChannel = channel
 	sp.audioQueue = append(sp.audioQueue, a)
 
 	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(len(sp.audioQueue)))
@@ -218,7 +219,8 @@ AudioLoop:
 			case audioSkip:
 				stream.SetPaused(true)
 				if len(sp.audioQueue) > 0 {
-					sp.playNext()
+					pn, ch := sp.playNext()
+					sp.sendMessage(ch, pn)
 				} else {
 					sp.audioPlaying = false
 					err = sp.Voice.Speaking(false)
@@ -238,7 +240,8 @@ AudioLoop:
 			encodingSession.Truncate()
 
 			if len(sp.audioQueue) > 0 {
-				sp.playNext()
+				pn, ch := sp.playNext()
+				sp.sendMessage(ch, pn)
 			} else {
 				sp.audioPlaying = false
 				err = sp.Voice.Speaking(false)

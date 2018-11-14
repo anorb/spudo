@@ -26,8 +26,8 @@ type messageReaction struct {
 }
 
 type spudoCommand struct {
-	Name            string                                          // Name of the command
-	Exec            func(author string, args ...string) interface{} // Function that will be executed when command is used
-	Description     string                                          // Description of command for a help command to use
-	PrivateResponse bool                                            // Indicates whether or not the command will yield a private message response
+	Name            string                                                   // Name of the command
+	Exec            func(author, channel string, args ...string) interface{} // Function that will be executed when command is used
+	Description     string                                                   // Description of command for a help command to use
+	PrivateResponse bool                                                     // Indicates whether or not the command will yield a private message response
 }
