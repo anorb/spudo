@@ -127,11 +127,12 @@ func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
 }
 
 func (sp *Spudo) playNext() (string, string) {
-	nowPlaying := "now playing `" + sp.audioQueue[0].Title + "`"
+	nowPlaying := fmt.Sprintf("now playing: `%v`", sp.audioQueue[0].Title)
+	duration := fmt.Sprintf("duration: `%v`", sp.audioQueue[0].Duration)
 	ch := sp.audioQueue[0].sendChannel
 	go sp.startAudio(sp.audioQueue[0])
 	sp.audioQueue = append(sp.audioQueue[:0], sp.audioQueue[0+1:]...)
-	return nowPlaying, ch
+	return nowPlaying + "\n" + duration, ch
 }
 
 func (sp *Spudo) queueAudio(audioLink, channel string) voiceCommand {
