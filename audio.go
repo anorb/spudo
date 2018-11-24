@@ -20,6 +20,9 @@ const (
 	audioStop
 )
 
+var errBadVoiceState = errors.New("Unable to find user voice state")
+var vcSameChannelMsg = voiceCommand("you must be in the same channel to use this command")
+
 type voiceCommand string
 
 type ytAudio struct {
@@ -60,7 +63,6 @@ func (sp *Spudo) joinVoice(author, channel string, args ...string) interface{} {
 	var err error
 
 	if sp.Voice != nil {
-		fmt.Println(sp.Voice.ChannelID)
 		return voiceCommand("already in voice channel")
 	}
 
@@ -75,6 +77,10 @@ func (sp *Spudo) joinVoice(author, channel string, args ...string) interface{} {
 func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} {
 	if sp.Voice == nil {
 		return voiceCommand("can't leave, not connected")
+	}
+
+	if !sp.userInVoiceChannel(author) {
+		return vcSameChannelMsg
 	}
 
 	sp.audioStatus = audioStop
@@ -93,6 +99,10 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 		return voiceCommand("unable to play, not in channel")
 	}
 
+	if !sp.userInVoiceChannel(author) {
+		return vcSameChannelMsg
+	}
+
 	if len(args) < 1 {
 		return voiceCommand("play requires a link argument")
 	}
@@ -107,6 +117,14 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 }
 
 func (sp *Spudo) togglePause(author, channel string, args ...string) interface{} {
+	if sp.Voice == nil {
+		return voiceCommand("unable to pause, not in channel")
+	}
+
+	if !sp.userInVoiceChannel(author) {
+		return vcSameChannelMsg
+	}
+
 	var vc voiceCommand
 	if sp.audioStatus == audioPause {
 		sp.audioControl <- audioResume
@@ -119,6 +137,14 @@ func (sp *Spudo) togglePause(author, channel string, args ...string) interface{}
 }
 
 func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
+	if sp.Voice == nil {
+		return voiceCommand("unable to skip, not in channel")
+	}
+
+	if !sp.userInVoiceChannel(author) {
+		return vcSameChannelMsg
+	}
+
 	if sp.audioStatus != audioPlay {
 		return voiceCommand("can't skip, no audio playing")
 	}
@@ -165,7 +191,7 @@ func (sp *Spudo) getUserVoiceState(userid string) (*discordgo.VoiceState, error)
 			}
 		}
 	}
-	return nil, errors.New("Unable to find user voice state")
+	return nil, errBadVoiceState
 }
 
 func (sp *Spudo) joinUserVoiceChannel(userID string) (*discordgo.VoiceConnection, error) {
@@ -174,6 +200,18 @@ func (sp *Spudo) joinUserVoiceChannel(userID string) (*discordgo.VoiceConnection
 		return nil, err
 	}
 	return sp.Session.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
+}
+
+func (sp *Spudo) userInVoiceChannel(userID string) bool {
+	vc, err := sp.getUserVoiceState(userID)
+	if err != nil && err != errBadVoiceState {
+		sp.logger.error("Error finding user voice state: ", err)
+		return false
+	}
+	if vc.ChannelID != sp.Voice.ChannelID {
+		return false
+	}
+	return true
 }
 
 func (sp *Spudo) startAudio(a *ytAudio) {
