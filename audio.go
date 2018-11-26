@@ -32,11 +32,6 @@ type ytAudio struct {
 }
 
 func (sp *Spudo) addAudioCommands() {
-	sp.spudoCommands["join"] = &spudoCommand{
-		Name:        "join",
-		Description: "join voice",
-		Exec:        sp.joinVoice,
-	}
 	sp.spudoCommands["leave"] = &spudoCommand{
 		Name:        "leave",
 		Description: "leave voice",
@@ -57,21 +52,6 @@ func (sp *Spudo) addAudioCommands() {
 		Description: "skip current track",
 		Exec:        sp.skipAudio,
 	}
-}
-
-func (sp *Spudo) joinVoice(author, channel string, args ...string) interface{} {
-	var err error
-
-	if sp.Voice != nil {
-		return voiceCommand("already in voice channel")
-	}
-
-	sp.Voice, err = sp.joinUserVoiceChannel(author)
-	if err != nil {
-		sp.logger.error("Error joining voice: ", err)
-		return voiceCommand("error joining voice channel")
-	}
-	return voiceCommand("joined voice channel")
 }
 
 func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} {
@@ -96,7 +76,15 @@ func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} 
 
 func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 	if sp.Voice == nil {
-		return voiceCommand("unable to play, not in channel")
+		var err error
+		sp.Voice, err = sp.joinUserVoiceChannel(author)
+		if err != nil {
+			if err == errBadVoiceState {
+				return voiceCommand("you must be in a voice channel to use this command")
+			}
+			sp.logger.error("Error joining voice: ", err)
+			return voiceCommand("error joining voice channel")
+		}
 	}
 
 	if !sp.userInVoiceChannel(author) {
