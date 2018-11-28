@@ -133,11 +133,11 @@ func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
 		return vcSameChannelMsg
 	}
 
-	if sp.audioStatus != audioPlay {
+	if sp.audioStatus != audioPlay && sp.audioStatus != audioPause {
 		return voiceCommand("can't skip, no audio playing")
 	}
 	sp.audioControl <- audioSkip
-	return voiceCommand("skipping current audio")
+	return voiceCommand("skipping...")
 }
 
 func (sp *Spudo) playNext() (string, string) {
