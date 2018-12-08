@@ -176,6 +176,7 @@ func (sp *Spudo) Start() {
 		sp.addAudioCommands()
 		sp.audioControl = make(chan int)
 		sp.audioStatus = audioStop
+		go sp.watchForDisconnect()
 		sp.logger.info("Audio commands added")
 	}
 

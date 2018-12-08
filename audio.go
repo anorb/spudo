@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jonas747/dca"
@@ -32,11 +33,6 @@ type ytAudio struct {
 }
 
 func (sp *Spudo) addAudioCommands() {
-	sp.spudoCommands["leave"] = &spudoCommand{
-		Name:        "leave",
-		Description: "leave voice",
-		Exec:        sp.leaveVoice,
-	}
 	sp.spudoCommands["play"] = &spudoCommand{
 		Name:        "play",
 		Description: "play next in queue",
@@ -54,24 +50,37 @@ func (sp *Spudo) addAudioCommands() {
 	}
 }
 
-func (sp *Spudo) leaveVoice(author, channel string, args ...string) interface{} {
-	if sp.Voice == nil {
-		return voiceCommand("can't leave, not connected")
-	}
+func (sp *Spudo) watchForDisconnect() {
+	for range time.Tick(1 * time.Second) {
+		if sp.Voice == nil {
+			continue
+		}
 
-	if !sp.userInVoiceChannel(author) {
-		return vcSameChannelMsg
-	}
+		userCount := sp.getListenerCount()
 
-	sp.audioStatus = audioStop
+		if userCount <= 1 {
+			sp.audioControl <- audioStop
 
-	err := sp.Voice.Disconnect()
-	if err != nil {
-		sp.logger.error("Error disconnecting from voice channel:", err)
-		return voiceCommand("error leaving voice")
+			err := sp.Voice.Disconnect()
+			if err != nil {
+				sp.logger.error("Error disconnecting from voice channel:", err)
+			}
+			sp.Voice = nil
+		}
 	}
-	sp.Voice = nil
-	return voiceCommand("left voice chat")
+}
+
+// Returns the number of users in the same voice channel
+func (sp *Spudo) getListenerCount() int {
+	count := 0
+	for _, guild := range sp.Session.State.Guilds {
+		for _, vs := range guild.VoiceStates {
+			if sp.Voice.ChannelID == vs.ChannelID {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
@@ -249,6 +258,9 @@ AudioLoop:
 						sp.logger.error("Failed to end speaking: ", err)
 					}
 				}
+				break AudioLoop
+			case audioStop:
+				sp.audioStatus = audioStop
 				break AudioLoop
 			}
 		case err := <-done:
