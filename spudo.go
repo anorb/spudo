@@ -50,6 +50,8 @@ type Spudo struct {
 	audioStatus  int
 }
 
+type unknownCommand string
+
 // NewSpudo will initialize everything Spudo needs to run.
 func NewSpudo() *Spudo {
 	sp := &Spudo{}
@@ -293,7 +295,7 @@ func (sp *Spudo) attemptCommand(author, channel, comStr string, args []string) (
 		private = com.PrivateResponse
 		return
 	}
-	return
+	return unknownCommand(sp.Config.UnknownCommandMessage), private
 }
 
 func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
@@ -313,6 +315,7 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 	commandResp, isPrivate := sp.attemptCommand(m.Author.ID, m.ChannelID, com, args)
 
 	switch v := commandResp.(type) {
+	case nil: // For commands that do not need a response
 	case string:
 		if isPrivate {
 			sp.sendPrivateMessage(m.Author.ID, v)
@@ -329,8 +332,8 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 		sp.startCooldown(m.Author.ID)
 	case voiceCommand:
 		sp.sendMessage(m.ChannelID, string(v))
-	default:
-		sp.respondToUser(m, sp.Config.UnknownCommandMessage)
+	case unknownCommand:
+		sp.respondToUser(m, string(v))
 	}
 }
 

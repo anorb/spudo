@@ -109,8 +109,8 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 	}
 
 	sp.queueAudio(args[0], channel)
-	pn, _ := sp.playNext()
-	return voiceCommand(pn)
+	go sp.startAudio()
+	return nil
 }
 
 func (sp *Spudo) togglePause(author, channel string, args ...string) interface{} {
@@ -147,15 +147,6 @@ func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
 	}
 	sp.audioControl <- audioSkip
 	return voiceCommand("skipping...")
-}
-
-func (sp *Spudo) playNext() (string, string) {
-	nowPlaying := fmt.Sprintf("now playing: `%v`", sp.audioQueue[0].Title)
-	duration := fmt.Sprintf("duration: `%v`", sp.audioQueue[0].Duration)
-	ch := sp.audioQueue[0].sendChannel
-	go sp.startAudio(sp.audioQueue[0])
-	sp.audioQueue = append(sp.audioQueue[:0], sp.audioQueue[0+1:]...)
-	return nowPlaying + "\n" + duration, ch
 }
 
 func (sp *Spudo) queueAudio(audioLink, channel string) voiceCommand {
@@ -211,12 +202,13 @@ func (sp *Spudo) userInVoiceChannel(userID string) bool {
 	return true
 }
 
-func (sp *Spudo) startAudio(a *ytAudio) {
+func (sp *Spudo) startAudio() {
 	err := sp.Voice.Speaking(true)
 	if err != nil {
 		sp.logger.error("Failed setting speaking: ", err)
 		return
 	}
+	defer sp.Voice.Speaking(false)
 
 	sp.audioStatus = audioPlay
 
@@ -225,17 +217,37 @@ func (sp *Spudo) startAudio(a *ytAudio) {
 	options.Bitrate = 96
 	options.Application = "lowdelay"
 
-	encodingSession, err := dca.EncodeFile(a.dlURL.String(), options)
-	if err != nil {
-		sp.logger.error("Error encoding file: ", err)
-		return
+	for {
+		audio := sp.audioQueue[0]
+		sp.audioQueue = append(sp.audioQueue[:0], sp.audioQueue[0+1:]...)
+
+		encodingSession, err := dca.EncodeFile(audio.dlURL.String(), options)
+		if err != nil {
+			sp.logger.error("Error encoding file: ", err)
+			return
+		}
+		defer encodingSession.Cleanup()
+		done := make(chan error)
+		stream := dca.NewStream(encodingSession, sp.Voice, done)
+
+		nowPlaying := fmt.Sprintf("now playing: `%v`", audio.Title)
+		duration := fmt.Sprintf("duration: `%v`", audio.Duration)
+		ch := audio.sendChannel
+		sp.sendMessage(ch, nowPlaying+"\n"+duration)
+
+		err = sp.sendAudio(stream, done)
+		if err != nil {
+			sp.logger.error("Error sending audio: ", err)
+		}
+
+		if len(sp.audioQueue) == 0 || sp.audioStatus == audioStop {
+			sp.audioStatus = audioStop
+			break
+		}
 	}
-	defer encodingSession.Cleanup()
+}
 
-	done := make(chan error)
-	stream := dca.NewStream(encodingSession, sp.Voice, done)
-
-AudioLoop:
+func (sp *Spudo) sendAudio(stream *dca.StreamingSession, done chan error) error {
 	for {
 		select {
 		case cmd := <-sp.audioControl:
@@ -248,41 +260,18 @@ AudioLoop:
 				stream.SetPaused(false)
 			case audioSkip:
 				stream.SetPaused(true)
-				if len(sp.audioQueue) > 0 {
-					pn, ch := sp.playNext()
-					sp.sendMessage(ch, pn)
-				} else {
-					sp.audioStatus = audioStop
-					err = sp.Voice.Speaking(false)
-					if err != nil {
-						sp.logger.error("Failed to end speaking: ", err)
-					}
-				}
-				break AudioLoop
+				return nil
 			case audioStop:
 				sp.audioStatus = audioStop
-				break AudioLoop
+				return nil
 			}
 		case err := <-done:
 			if err != nil {
 				if err != io.ErrUnexpectedEOF && err != io.EOF {
-					sp.logger.error("Audio error: ", err)
+					return err
 				}
 			}
-
-			encodingSession.Truncate()
-
-			if len(sp.audioQueue) > 0 {
-				pn, ch := sp.playNext()
-				sp.sendMessage(ch, pn)
-			} else {
-				sp.audioStatus = audioStop
-				err = sp.Voice.Speaking(false)
-				if err != nil {
-					sp.logger.error("Failed to end speaking: ", err)
-				}
-			}
-			break AudioLoop
+			return nil
 		}
 	}
 }
