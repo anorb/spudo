@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -21,7 +22,12 @@ const (
 	audioStop
 )
 
-var errBadVoiceState = errors.New("Unable to find user voice state")
+var (
+	errBadVoiceState    = errors.New("Unable to find user voice state")
+	errBadQueuePosition = errors.New("Bad queue position")
+	errEndOfQueue       = errors.New("End of queue")
+)
+
 var vcSameChannelMsg = voiceCommand("you must be in the same channel to use this command")
 
 type voiceCommand string
@@ -30,6 +36,48 @@ type ytAudio struct {
 	*ytdl.VideoInfo
 	dlURL       *url.URL
 	sendChannel string
+}
+
+type audioQueue struct {
+	sync.Mutex
+	playlist []*ytAudio
+	position int
+}
+
+func newAudioQueue() *audioQueue {
+	return &audioQueue{
+		playlist: []*ytAudio{},
+		position: 0,
+	}
+}
+
+func (q *audioQueue) add(audio *ytAudio) int {
+	q.Lock()
+	defer q.Unlock()
+
+	q.playlist = append(q.playlist, audio)
+	return len(q.playlist) - q.position
+}
+
+func (q *audioQueue) next() error {
+	q.Lock()
+	defer q.Unlock()
+
+	if q.position+1 >= 0 && q.position+1 < len(q.playlist) {
+		q.position++
+		return nil
+	}
+	return errEndOfQueue
+}
+
+func (q *audioQueue) current() (*ytAudio, error) {
+	q.Lock()
+	defer q.Unlock()
+
+	if q.position+1 >= 0 && q.position < len(q.playlist) {
+		return q.playlist[q.position], nil
+	}
+	return nil, errBadQueuePosition
 }
 
 func (sp *Spudo) addAudioCommands() {
@@ -166,9 +214,9 @@ func (sp *Spudo) queueAudio(audioLink, channel string) voiceCommand {
 	}
 
 	a.sendChannel = channel
-	sp.audioQueue = append(sp.audioQueue, a)
+	audioPos := sp.audioQueue.add(a)
 
-	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(len(sp.audioQueue)))
+	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(audioPos))
 }
 
 func (sp *Spudo) getUserVoiceState(userid string) (*discordgo.VoiceState, error) {
@@ -218,13 +266,16 @@ func (sp *Spudo) startAudio() {
 	options.Application = "lowdelay"
 
 	for {
-		audio := sp.audioQueue[0]
-		sp.audioQueue = append(sp.audioQueue[:0], sp.audioQueue[0+1:]...)
+		audio, err := sp.audioQueue.current()
+		if err != nil {
+			sp.logger.error("Error getting current song in queue: ", err)
+			break
+		}
 
 		encodingSession, err := dca.EncodeFile(audio.dlURL.String(), options)
 		if err != nil {
 			sp.logger.error("Error encoding file: ", err)
-			return
+			break
 		}
 		defer encodingSession.Cleanup()
 		done := make(chan error)
@@ -240,8 +291,16 @@ func (sp *Spudo) startAudio() {
 			sp.logger.error("Error sending audio: ", err)
 		}
 
-		if len(sp.audioQueue) == 0 || sp.audioStatus == audioStop {
-			sp.audioStatus = audioStop
+		// If the stop command is issued, sendAudio would
+		// return and we break out of the audio loop here
+		if sp.audioStatus == audioStop {
+			break
+		}
+
+		// If this returns non-nil, we know we've reached the
+		// end of the queue
+		err = sp.audioQueue.next()
+		if err != nil {
 			break
 		}
 	}

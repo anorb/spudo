@@ -45,7 +45,7 @@ type Spudo struct {
 	messageReactions []*messageReaction
 
 	Voice        *discordgo.VoiceConnection
-	audioQueue   []*ytAudio
+	audioQueue   *audioQueue
 	audioControl chan int
 	audioStatus  int
 }
@@ -178,6 +178,7 @@ func (sp *Spudo) Start() {
 		sp.addAudioCommands()
 		sp.audioControl = make(chan int)
 		sp.audioStatus = audioStop
+		sp.audioQueue = newAudioQueue()
 		go sp.watchForDisconnect()
 		sp.logger.info("Audio commands added")
 	}
