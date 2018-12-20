@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"strconv"
 	"sync"
@@ -36,6 +37,22 @@ type ytAudio struct {
 	*ytdl.VideoInfo
 	dlURL       *url.URL
 	sendChannel string
+}
+
+type spAudio struct {
+	sync.Mutex
+	Voice        *discordgo.VoiceConnection
+	audioControl chan int
+	audioQueue   *audioQueue
+	audioStatus  int
+}
+
+func newSpAudio() *spAudio {
+	return &spAudio{
+		audioControl: make(chan int),
+		audioStatus:  audioStop,
+		audioQueue:   newAudioQueue(),
+	}
 }
 
 type audioQueue struct {
@@ -100,41 +117,90 @@ func (sp *Spudo) addAudioCommands() {
 
 func (sp *Spudo) watchForDisconnect() {
 	for range time.Tick(1 * time.Second) {
-		if sp.Voice == nil {
-			continue
-		}
-
-		userCount := sp.getListenerCount()
-
-		if userCount <= 1 {
-			sp.audioControl <- audioStop
-
-			err := sp.Voice.Disconnect()
+		for _, as := range sp.audioSessions {
+			userCount, err := sp.getListenerCount(as.Voice.GuildID, as.Voice.ChannelID)
 			if err != nil {
-				sp.logger.error("Error disconnecting from voice channel:", err)
+				sp.logger.error("Error getting listener count: ", err)
+				continue
 			}
-			sp.Voice = nil
+			if userCount <= 1 {
+				if as.audioStatus == audioPlay || as.audioStatus == audioPause {
+					as.audioControl <- audioStop
+				}
+
+				err := as.Voice.Disconnect()
+				if err != nil {
+					sp.logger.error("Error disconnecting from voice channel:", err)
+				}
+				sp.removeAudioSession(as.Voice.GuildID)
+			}
 		}
 	}
 }
 
 // Returns the number of users in the same voice channel
-func (sp *Spudo) getListenerCount() int {
-	count := 0
-	for _, guild := range sp.Session.State.Guilds {
-		for _, vs := range guild.VoiceStates {
-			if sp.Voice.ChannelID == vs.ChannelID {
-				count++
-			}
+func (sp *Spudo) getListenerCount(guildid, channelid string) (count int, err error) {
+	g, err := sp.Session.Guild(guildid)
+	if err != nil {
+		return
+	}
+	for _, vs := range g.VoiceStates {
+		if channelid == vs.ChannelID {
+			count++
 		}
 	}
-	return count
+	return
+}
+
+func (sp *Spudo) getAudioSession(id string) (*spAudio, bool) {
+	sp.Lock()
+	defer sp.Unlock()
+	audioSess, exists := sp.audioSessions[id]
+	if !exists {
+		return nil, false
+	}
+	return audioSess, true
+}
+
+func (sp *Spudo) addAudioSession(author string) (*spAudio, error) {
+	sp.Lock()
+	defer sp.Unlock()
+	audioSess := newSpAudio()
+
+	var err error
+
+	audioSess.Voice, err = sp.joinUserVoiceChannel(author)
+	if err != nil {
+		return nil, err
+	}
+
+	sp.audioSessions[audioSess.Voice.GuildID] = audioSess
+
+	return audioSess, nil
+}
+
+func (sp *Spudo) removeAudioSession(id string) {
+	sp.Lock()
+	defer sp.Unlock()
+	delete(sp.audioSessions, id)
 }
 
 func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
-	if sp.Voice == nil {
+	if len(args) < 1 {
+		return voiceCommand("play requires a link argument")
+	}
+
+	vs, err := sp.getUserVoiceState(author)
+	if err != nil {
+		sp.logger.error("Error getting voice state: ", err)
+		return voiceCommand("err")
+	}
+
+	audioSess, exists := sp.getAudioSession(vs.GuildID)
+	if !exists {
 		var err error
-		sp.Voice, err = sp.joinUserVoiceChannel(author)
+
+		audioSess, err = sp.addAudioSession(author)
 		if err != nil {
 			if err == errBadVoiceState {
 				return voiceCommand("you must be in a voice channel to use this command")
@@ -148,21 +214,25 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 		return vcSameChannelMsg
 	}
 
-	if len(args) < 1 {
-		return voiceCommand("play requires a link argument")
+	// If audio is actively being played, return the queued message from queueAudio
+	if audioSess.audioStatus == audioPlay || audioSess.audioStatus == audioPause {
+		return audioSess.queueAudio(args[0], channel)
 	}
 
-	if sp.audioStatus == audioPlay || sp.audioStatus == audioPause {
-		return sp.queueAudio(args[0], channel)
-	}
-
-	sp.queueAudio(args[0], channel)
-	go sp.startAudio()
+	audioSess.queueAudio(args[0], channel)
+	go audioSess.startAudio(sp.Session)
 	return nil
 }
 
 func (sp *Spudo) togglePause(author, channel string, args ...string) interface{} {
-	if sp.Voice == nil {
+	vs, err := sp.getUserVoiceState(author)
+	if err != nil {
+		sp.logger.error("Error getting voice state: ", err)
+		return voiceCommand("err")
+	}
+
+	audioSess, exists := sp.getAudioSession(vs.GuildID)
+	if !exists {
 		return voiceCommand("unable to pause, not in channel")
 	}
 
@@ -171,52 +241,37 @@ func (sp *Spudo) togglePause(author, channel string, args ...string) interface{}
 	}
 
 	var vc voiceCommand
-	if sp.audioStatus == audioPause {
-		sp.audioControl <- audioResume
+	if audioSess.audioStatus == audioPause {
+		audioSess.audioControl <- audioResume
 		vc = voiceCommand("resuming audio")
-	} else if sp.audioStatus == audioPlay {
-		sp.audioControl <- audioPause
+	} else if audioSess.audioStatus == audioPlay {
+		audioSess.audioControl <- audioPause
 		vc = voiceCommand("pausing audio")
 	}
 	return vc
 }
 
 func (sp *Spudo) skipAudio(author, channel string, args ...string) interface{} {
-	if sp.Voice == nil {
-		return voiceCommand("unable to skip, not in channel")
+	vs, err := sp.getUserVoiceState(author)
+	if err != nil {
+		sp.logger.error("Error getting voice state: ", err)
+		return voiceCommand("err")
+	}
+
+	audioSess, exists := sp.getAudioSession(vs.GuildID)
+	if !exists {
+		return voiceCommand("unable to pause, not in channel")
 	}
 
 	if !sp.userInVoiceChannel(author) {
 		return vcSameChannelMsg
 	}
 
-	if sp.audioStatus != audioPlay && sp.audioStatus != audioPause {
+	if audioSess.audioStatus != audioPlay && audioSess.audioStatus != audioPause {
 		return voiceCommand("can't skip, no audio playing")
 	}
-	sp.audioControl <- audioSkip
+	audioSess.audioControl <- audioSkip
 	return voiceCommand("skipping...")
-}
-
-func (sp *Spudo) queueAudio(audioLink, channel string) voiceCommand {
-	a := new(ytAudio)
-	var err error
-	a.VideoInfo, err = ytdl.GetVideoInfo(audioLink)
-	if err != nil {
-		sp.logger.error("Error getting video info: ", err)
-		return voiceCommand("failed to add item to queue")
-	}
-
-	format := a.VideoInfo.Formats.Extremes(ytdl.FormatAudioBitrateKey, true)[0]
-	a.dlURL, err = a.VideoInfo.GetDownloadURL(format)
-	if err != nil {
-		sp.logger.error("Error getting download url: ", err)
-		return voiceCommand("failed to add item to queue")
-	}
-
-	a.sendChannel = channel
-	audioPos := sp.audioQueue.add(a)
-
-	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(audioPos))
 }
 
 func (sp *Spudo) getUserVoiceState(userid string) (*discordgo.VoiceState, error) {
@@ -244,21 +299,45 @@ func (sp *Spudo) userInVoiceChannel(userID string) bool {
 		sp.logger.error("Error finding user voice state: ", err)
 		return false
 	}
-	if vc.ChannelID != sp.Voice.ChannelID {
-		return false
+	for _, as := range sp.audioSessions {
+		if vc.ChannelID == as.Voice.ChannelID {
+			return true
+		}
 	}
-	return true
+	return false
 }
 
-func (sp *Spudo) startAudio() {
-	err := sp.Voice.Speaking(true)
+func (sa *spAudio) queueAudio(audioLink, channel string) voiceCommand {
+	a := new(ytAudio)
+	var err error
+	a.VideoInfo, err = ytdl.GetVideoInfo(audioLink)
 	if err != nil {
-		sp.logger.error("Failed setting speaking: ", err)
+		log.Println("Error getting video info: ", err)
+		return voiceCommand("failed to add item to queue")
+	}
+
+	format := a.VideoInfo.Formats.Extremes(ytdl.FormatAudioBitrateKey, true)[0]
+	a.dlURL, err = a.VideoInfo.GetDownloadURL(format)
+	if err != nil {
+		log.Println("Error getting download url: ", err)
+		return voiceCommand("failed to add item to queue")
+	}
+
+	a.sendChannel = channel
+	audioPos := sa.audioQueue.add(a)
+
+	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(audioPos))
+}
+
+func (sa *spAudio) startAudio(sess *discordgo.Session) {
+	err := sa.Voice.Speaking(true)
+	if err != nil {
+		log.Println("Failed setting speaking: ", err)
 		return
 	}
-	defer sp.Voice.Speaking(false)
+	defer sa.Voice.Speaking(false)
 
-	sp.audioStatus = audioPlay
+	sa.audioStatus = audioPlay
 
 	options := dca.StdEncodeOptions
 	options.RawOutput = true
@@ -266,62 +345,62 @@ func (sp *Spudo) startAudio() {
 	options.Application = "lowdelay"
 
 	for {
-		audio, err := sp.audioQueue.current()
+		audio, err := sa.audioQueue.current()
 		if err != nil {
-			sp.logger.error("Error getting current song in queue: ", err)
+			log.Println("Error getting current song in queue: ", err)
 			break
 		}
 
 		encodingSession, err := dca.EncodeFile(audio.dlURL.String(), options)
 		if err != nil {
-			sp.logger.error("Error encoding file: ", err)
+			log.Println("Error encoding file: ", err)
 			break
 		}
 		defer encodingSession.Cleanup()
 		done := make(chan error)
-		stream := dca.NewStream(encodingSession, sp.Voice, done)
+		stream := dca.NewStream(encodingSession, sa.Voice, done)
 
 		nowPlaying := fmt.Sprintf("now playing: `%v`", audio.Title)
 		duration := fmt.Sprintf("duration: `%v`", audio.Duration)
-		ch := audio.sendChannel
-		sp.sendMessage(ch, nowPlaying+"\n"+duration)
+		sess.ChannelMessageSend(audio.sendChannel, nowPlaying+"\n"+duration)
 
-		err = sp.sendAudio(stream, done)
+		err = sa.sendAudio(stream, done)
 		if err != nil {
-			sp.logger.error("Error sending audio: ", err)
+			log.Println("Error sending audio: ", err)
 		}
 
 		// If the stop command is issued, sendAudio would
 		// return and we break out of the audio loop here
-		if sp.audioStatus == audioStop {
+		if sa.audioStatus == audioStop {
 			break
 		}
 
 		// If this returns non-nil, we know we've reached the
 		// end of the queue
-		err = sp.audioQueue.next()
+		err = sa.audioQueue.next()
 		if err != nil {
+			sa.audioStatus = audioStop
 			break
 		}
 	}
 }
 
-func (sp *Spudo) sendAudio(stream *dca.StreamingSession, done chan error) error {
+func (sa *spAudio) sendAudio(stream *dca.StreamingSession, done chan error) error {
 	for {
 		select {
-		case cmd := <-sp.audioControl:
+		case cmd := <-sa.audioControl:
 			switch cmd {
 			case audioPause:
-				sp.audioStatus = audioPause
+				sa.audioStatus = audioPause
 				stream.SetPaused(true)
 			case audioResume:
-				sp.audioStatus = audioPlay
+				sa.audioStatus = audioPlay
 				stream.SetPaused(false)
 			case audioSkip:
 				stream.SetPaused(true)
 				return nil
 			case audioStop:
-				sp.audioStatus = audioStop
+				sa.audioStatus = audioStop
 				return nil
 			}
 		case err := <-done:

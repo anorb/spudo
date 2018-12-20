@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -31,6 +32,7 @@ type Config struct {
 
 // Spudo contains everything about the bot itself
 type Spudo struct {
+	sync.Mutex
 	Session       *discordgo.Session
 	Config        Config
 	CooldownList  map[string]time.Time
@@ -44,10 +46,7 @@ type Spudo struct {
 	userReactions    []*userReaction
 	messageReactions []*messageReaction
 
-	Voice        *discordgo.VoiceConnection
-	audioQueue   *audioQueue
-	audioControl chan int
-	audioStatus  int
+	audioSessions map[string]*spAudio
 }
 
 type unknownCommand string
@@ -176,9 +175,7 @@ func (sp *Spudo) Start() {
 
 	if sp.Config.AudioEnabled {
 		sp.addAudioCommands()
-		sp.audioControl = make(chan int)
-		sp.audioStatus = audioStop
-		sp.audioQueue = newAudioQueue()
+		sp.audioSessions = make(map[string]*spAudio)
 		go sp.watchForDisconnect()
 		sp.logger.info("Audio commands added")
 	}
@@ -202,8 +199,8 @@ func (sp *Spudo) Start() {
 // quit handles everything that needs to occur for the bot to shutdown cleanly.
 func (sp *Spudo) quit() {
 	sp.logger.info("Bot is now shutting down")
-	if sp.Voice != nil {
-		if err := sp.Voice.Disconnect(); err != nil {
+	for _, as := range sp.audioSessions {
+		if err := as.Voice.Disconnect(); err != nil {
 			sp.logger.fatal("Error disconnecting from voice channel:", err)
 		}
 	}
