@@ -80,8 +80,8 @@ func (q *audioQueue) next() error {
 	q.Lock()
 	defer q.Unlock()
 
-	if q.position+1 >= 0 && q.position+1 < len(q.playlist) {
-		q.position++
+	q.position++
+	if q.position >= 0 && q.position < len(q.playlist) {
 		return nil
 	}
 	return errEndOfQueue
