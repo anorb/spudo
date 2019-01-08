@@ -1,5 +1,9 @@
 package spudo
 
+import (
+	"net/http"
+)
+
 // AddCommand will add a command that will trigger Exec.
 func (sp *Spudo) AddCommand(name, description string, exec func(args []string) interface{}) {
 	sp.commands[name] = &command{
@@ -43,4 +47,13 @@ func (sp *Spudo) AddMessageReaction(name string, triggerWords, reactionIDs []str
 	}
 	sp.messageReactions = append(sp.messageReactions, p)
 	sp.logger.info("Message reaction added: ", name)
+}
+
+func (sp *Spudo) AddRESTRoute(route string, exec func(w http.ResponseWriter, r *http.Request)) {
+	if !sp.Config.RESTEnabled {
+		sp.logger.info("Failed to add REST route - REST API is disabled")
+		return
+	}
+	http.HandleFunc("/"+route, exec)
+	sp.logger.info("REST route added: ", route)
 }

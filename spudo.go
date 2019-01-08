@@ -28,6 +28,8 @@ type Config struct {
 	CooldownMessage       string
 	UnknownCommandMessage string
 	AudioEnabled          bool
+	RESTEnabled           bool
+	RESTPort              string
 }
 
 // Spudo contains everything about the bot itself
@@ -62,6 +64,22 @@ func NewSpudo() *Spudo {
 	sp.messageReactions = make([]*messageReaction, 0)
 
 	sp.spudoCommands = make(map[string]*spudoCommand)
+
+	configPath := flag.String("config", "./config.toml", "TODO")
+	flag.Parse()
+
+	// Check if config exists, if it doesn't use
+	// createMinimalConfig to generate one.
+	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
+		sp.logger.info("Config not detected, attempting to create...")
+		if err := sp.createMinimalConfig(); err != nil {
+			sp.logger.fatal("Failed to create minimal config", err)
+		}
+	}
+
+	if err := sp.loadConfig(*configPath); err != nil {
+		sp.logger.fatal(err.Error())
+	}
 	return sp
 }
 
@@ -151,23 +169,7 @@ func (sp *Spudo) createSession() error {
 // Start will add handler functions to the Session and open the
 // websocket connection
 func (sp *Spudo) Start() {
-	configPath := flag.String("config", "./config.toml", "TODO")
-	flag.Parse()
-
 	rand.Seed(time.Now().UnixNano())
-
-	// Check if config exists, if it doesn't use
-	// createMinimalConfig to generate one.
-	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
-		sp.logger.info("Config not detected, attempting to create...")
-		if err := sp.createMinimalConfig(); err != nil {
-			sp.logger.fatal("Failed to create minimal config", err)
-		}
-	}
-
-	if err := sp.loadConfig(*configPath); err != nil {
-		sp.logger.fatal(err.Error())
-	}
 
 	if err := sp.createSession(); err != nil {
 		sp.logger.fatal(err.Error())
@@ -178,6 +180,10 @@ func (sp *Spudo) Start() {
 		sp.audioSessions = make(map[string]*spAudio)
 		go sp.watchForDisconnect()
 		sp.logger.info("Audio commands added")
+	}
+
+	if sp.Config.RESTEnabled {
+		go sp.startRESTApi()
 	}
 
 	sp.Session.AddHandler(sp.onReady)
@@ -212,7 +218,7 @@ func (sp *Spudo) quit() {
 
 func (sp *Spudo) onReady(s *discordgo.Session, r *discordgo.Ready) {
 	if sp.Config.WelcomeBackMessage != "" && sp.Config.DefaultChannelID != "" {
-		sp.sendMessage(sp.Config.DefaultChannelID, sp.Config.WelcomeBackMessage)
+		sp.SendMessage(sp.Config.DefaultChannelID, sp.Config.WelcomeBackMessage)
 	}
 	if !sp.TimersStarted && sp.Config.DefaultChannelID != "" {
 		sp.startTimedMessages()
@@ -230,9 +236,9 @@ func (sp *Spudo) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreat
 	go sp.handleMessageReaction(m)
 }
 
-// sendMessage is a helper function around ChannelMessageSend from
+// SendMessage is a helper function around ChannelMessageSend from
 // discordgo. It will send a message to a given channel.
-func (sp *Spudo) sendMessage(channelID string, message string) {
+func (sp *Spudo) SendMessage(channelID string, message string) {
 	_, err := sp.Session.ChannelMessageSend(channelID, message)
 	if err != nil {
 		sp.logger.error("Failed to send message response -", err)
@@ -258,16 +264,16 @@ func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
 	}
 	switch v := message.(type) {
 	case string:
-		sp.sendMessage(privChannel.ID, v)
+		sp.SendMessage(privChannel.ID, v)
 	case *discordgo.MessageEmbed:
 		sp.sendEmbed(privChannel.ID, v)
 	}
 }
 
-// respondToUser is a helper method around sendMessage that will
+// respondToUser is a helper method around SendMessage that will
 // mention the user who created the message.
 func (sp *Spudo) respondToUser(m *discordgo.MessageCreate, response string) {
-	sp.sendMessage(m.ChannelID, fmt.Sprintf("%s", m.Author.Mention()+" "+response))
+	sp.SendMessage(m.ChannelID, fmt.Sprintf("%s", m.Author.Mention()+" "+response))
 }
 
 // addReaction is a helper method around MessageReactionAdd from
@@ -329,7 +335,7 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 		}
 		sp.startCooldown(m.Author.ID)
 	case voiceCommand:
-		sp.sendMessage(m.ChannelID, string(v))
+		sp.SendMessage(m.ChannelID, string(v))
 	case unknownCommand:
 		sp.respondToUser(m, string(v))
 	}
@@ -382,7 +388,7 @@ func (sp *Spudo) startTimedMessages() {
 			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
-				sp.sendMessage(sp.Config.DefaultChannelID, v)
+				sp.SendMessage(sp.Config.DefaultChannelID, v)
 			case *Embed:
 				sp.sendEmbed(sp.Config.DefaultChannelID, v.MessageEmbed)
 			}
