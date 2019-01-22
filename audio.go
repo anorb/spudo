@@ -186,6 +186,8 @@ func (sp *Spudo) removeAudioSession(id string) {
 }
 
 func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
+	sp.CommandMutex.Lock()
+	defer sp.CommandMutex.Unlock()
 	if len(args) < 1 {
 		return voiceCommand("play requires a link argument")
 	}
@@ -220,6 +222,7 @@ func (sp *Spudo) playAudio(author, channel string, args ...string) interface{} {
 	}
 
 	audioSess.queueAudio(args[0], channel)
+	audioSess.audioStatus = audioPlay
 	go audioSess.startAudio(sp.Session)
 	return nil
 }
@@ -336,8 +339,6 @@ func (sa *spAudio) startAudio(sess *discordgo.Session) {
 		return
 	}
 	defer sa.Voice.Speaking(false)
-
-	sa.audioStatus = audioPlay
 
 	options := dca.StdEncodeOptions
 	options.RawOutput = true

@@ -35,6 +35,7 @@ type Config struct {
 // Spudo contains everything about the bot itself
 type Spudo struct {
 	sync.Mutex
+	CommandMutex  sync.Mutex
 	Session       *discordgo.Session
 	Config        Config
 	CooldownList  map[string]time.Time
