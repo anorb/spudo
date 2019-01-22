@@ -98,6 +98,9 @@ func (q *audioQueue) current() (*ytAudio, error) {
 }
 
 func (sp *Spudo) addAudioCommands() {
+	// Explicitly set audio commands outside of the standard
+	// AddCommand method so audio commands will overwrite anything
+	// with the same name
 	sp.spudoCommands["play"] = &spudoCommand{
 		Name:        "play",
 		Description: "play next in queue",
