@@ -301,10 +301,12 @@ func (sp *Spudo) joinUserVoiceChannel(userID string) (*discordgo.VoiceConnection
 
 func (sp *Spudo) userInVoiceChannel(userID string) bool {
 	vc, err := sp.getUserVoiceState(userID)
-	if err != nil && err != errBadVoiceState {
+	if err != nil {
 		sp.logger.error("Error finding user voice state: ", err)
 		return false
 	}
+	sp.Lock()
+	defer sp.Unlock()
 	for _, as := range sp.audioSessions {
 		if vc.ChannelID == as.Voice.ChannelID {
 			return true
