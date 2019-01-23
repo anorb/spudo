@@ -20,6 +20,11 @@ CooldownMessage="You have used too many commands"
 WelcomeBackMessage="I'm back"
 # Message that will be sent when a user issues an invalid command (Optional, default: Invalid command!)
 UnknownCommandMessage="Command is invalid"
+# Enable audio capability
+AudioEnabled=true
+# Enable REST capability and which port it listens on
+RESTEnabled=true
+RESTPort="8889"
 ```
 ### Create bot
 ```go
@@ -43,6 +48,34 @@ func ping(args []string) interface{} {
 ```
 Further examples can be found [here](./examples/bot/main.go).
 
+## Advanced features
+### Audio
+Spudo has audio playback which only works with Youtube (for now). Simply set AudioEnabled to true in the config and the commands will be enabled.
+
+- !play *youtube-link* will cause the bot to join your channel and begin playing the audio from the link
+  - If there is already audio playing, it will queue the audio and play it next
+- !pause will pause currently playing audio
+- !skip will skip the current track and play the next one if there is one available
+
+### REST API
+Spudo has the ability to start a REST API that can be used to send messages to a specific channel when it receives a hit. Point any webhooks you want at it and parse the request. Be sure to enable this feature in the config and choose a port to listen on.
+```go
+var (
+	bot           = spudo.NewSpudo()
+	sendChannelID = "channel-id-here"
+)
+
+func main() {
+	bot.AddRESTRoute("endpoint", eventHandler)
+	bot.Start()
+}
+
+func eventHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+            bot.SendMessage(sendChannelID, "Received something!")
+	}
+}
+```
 ## FAQ
 
 ### What kind of plugins can be made?

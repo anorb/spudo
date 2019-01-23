@@ -53,6 +53,8 @@ func (sp *Spudo) AddMessageReaction(name string, triggerWords, reactionIDs []str
 	sp.logger.info("Message reaction added: ", name)
 }
 
+// AddRestRoute will add an endpoint at route that will execute exec
+// when used.
 func (sp *Spudo) AddRESTRoute(route string, exec func(w http.ResponseWriter, r *http.Request)) {
 	if !sp.Config.RESTEnabled {
 		sp.logger.info("Failed to add REST route - REST API is disabled")
