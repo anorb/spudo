@@ -22,9 +22,7 @@ import (
 type Config struct {
 	Token                 string
 	CommandPrefix         string
-	DefaultChannelID      string
 	CooldownTimer         int
-	WelcomeBackMessage    string
 	CooldownMessage       string
 	UnknownCommandMessage string
 	AudioEnabled          bool
@@ -45,6 +43,7 @@ type Spudo struct {
 	spudoCommands map[string]*spudoCommand
 
 	commands         map[string]*command
+	startupPlugins   []*startupPlugin
 	timedMessages    []*timedMessage
 	userReactions    []*userReaction
 	messageReactions []*messageReaction
@@ -102,14 +101,12 @@ func getDefaultConfig() Config {
 		CommandPrefix:         "!",
 		CooldownTimer:         10,
 		CooldownMessage:       "Too many commands at once!",
-		WelcomeBackMessage:    "I'm back!",
 		UnknownCommandMessage: "Invalid command!",
 	}
 }
 
-// createMinimalConfig prompts the user to enter a Token and
-// DefaultChannelID for the Config. This is used if no config is
-// found.
+// createMinimalConfig prompts the user to enter a Token and for the
+// Config. This is used if no config is found.
 func (sp *Spudo) createMinimalConfig() error {
 	// Set default config
 	sp.Config = getDefaultConfig()
@@ -117,11 +114,6 @@ func (sp *Spudo) createMinimalConfig() error {
 
 	var err error
 	sp.Config.Token, err = getInput("Enter token: ")
-	if err != nil {
-		return err
-	}
-
-	sp.Config.DefaultChannelID, err = getInput("Enter default channel ID: ")
 	if err != nil {
 		return err
 	}
@@ -150,11 +142,6 @@ func (sp *Spudo) loadConfig(configPath string) error {
 	if sp.Config.Token == "" {
 		return errors.New("No token in config")
 	}
-
-	if sp.Config.DefaultChannelID == "" {
-		sp.logger.info("No DefaultChannelID set in config - Welcome back message and timed messages will not be sent")
-	}
-
 	return nil
 }
 
@@ -218,10 +205,11 @@ func (sp *Spudo) quit() {
 }
 
 func (sp *Spudo) onReady(s *discordgo.Session, r *discordgo.Ready) {
-	if sp.Config.WelcomeBackMessage != "" && sp.Config.DefaultChannelID != "" {
-		sp.SendMessage(sp.Config.DefaultChannelID, sp.Config.WelcomeBackMessage)
+	for _, p := range sp.startupPlugins {
+		p.Exec()
 	}
-	if !sp.TimersStarted && sp.Config.DefaultChannelID != "" {
+
+	if !sp.TimersStarted {
 		sp.startTimedMessages()
 	}
 }
@@ -389,9 +377,9 @@ func (sp *Spudo) startTimedMessages() {
 			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
-				sp.SendMessage(sp.Config.DefaultChannelID, v)
+				sp.SendMessage(p.Channel, v)
 			case *Embed:
-				sp.sendEmbed(sp.Config.DefaultChannelID, v.MessageEmbed)
+				sp.sendEmbed(p.Channel, v.MessageEmbed)
 			}
 		}); err != nil {
 			sp.logger.error("Error starting "+p.Name+" timed message - ", err)

@@ -18,11 +18,23 @@ func (sp *Spudo) AddCommand(name, description string, exec func(args []string) i
 	sp.logger.info("Command added: ", name)
 }
 
+// AddStartupPlugin will trigger exec when the bot initially starts
+// up.
+func (sp *Spudo) AddStartupPlugin(name string, exec func()) {
+	p := &startupPlugin{
+		Name: name,
+		Exec: exec,
+	}
+	sp.startupPlugins = append(sp.startupPlugins, p)
+	sp.logger.info("Startup plugin added: ", name)
+}
+
 // AddTimedMessage will trigger Exec at specific times to send a
 // message.
-func (sp *Spudo) AddTimedMessage(name, cronString string, exec func() interface{}) {
+func (sp *Spudo) AddTimedMessage(name, channel, cronString string, exec func() interface{}) {
 	p := &timedMessage{
 		Name:       name,
+		Channel:    channel,
 		CronString: cronString,
 		Exec:       exec,
 	}

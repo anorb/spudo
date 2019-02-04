@@ -7,8 +7,14 @@ type command struct {
 	PrivateResponse bool                            // Indicates whether or not the command will yield a private message response
 }
 
+type startupPlugin struct {
+	Name string
+	Exec func()
+}
+
 type timedMessage struct {
 	Name       string             // Name of the timed message
+	Channel    string             // ID of channel the message should be sent in
 	CronString string             // Cron-style string to determine when the Exec function is executed
 	Exec       func() interface{} // Function that will be executed
 }
