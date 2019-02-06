@@ -16,7 +16,7 @@ func main() {
 		bot.SendMessage("789654132546789", "I'm back!")
 	})
 
-	bot.AddTimedMessage("five seconds", "354846132188644643", "0,5,10,15,20,25,30,35,40,45,50,55 * * * * *", timer)
+	bot.AddTimedMessage("five seconds", "0,5,10,15,20,25,30,35,40,45,50,55 * * * * *", []string{"354846132188644643"}, timer)
 
 	bot.AddMessageReaction("reacts to ok", []string{"ok"}, []string{"👌"})
 

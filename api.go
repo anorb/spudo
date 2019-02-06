@@ -31,10 +31,10 @@ func (sp *Spudo) AddStartupPlugin(name string, exec func()) {
 
 // AddTimedMessage will trigger Exec at specific times to send a
 // message.
-func (sp *Spudo) AddTimedMessage(name, channel, cronString string, exec func() interface{}) {
+func (sp *Spudo) AddTimedMessage(name, cronString string, channels []string, exec func() interface{}) {
 	p := &timedMessage{
 		Name:       name,
-		Channel:    channel,
+		Channels:   channels,
 		CronString: cronString,
 		Exec:       exec,
 	}
@@ -65,7 +65,7 @@ func (sp *Spudo) AddMessageReaction(name string, triggerWords, reactionIDs []str
 	sp.logger.info("Message reaction added: ", name)
 }
 
-// AddRestRoute will add an endpoint at route that will execute exec
+// AddRESTRoute will add an endpoint at route that will execute exec
 // when used.
 func (sp *Spudo) AddRESTRoute(route string, exec func(w http.ResponseWriter, r *http.Request)) {
 	if !sp.Config.RESTEnabled {

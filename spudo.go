@@ -377,9 +377,14 @@ func (sp *Spudo) startTimedMessages() {
 			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
-				sp.SendMessage(p.Channel, v)
+				for _, chanID := range p.Channels {
+					sp.SendMessage(chanID, v)
+				}
 			case *Embed:
-				sp.sendEmbed(p.Channel, v.MessageEmbed)
+				for _, chanID := range p.Channels {
+					sp.sendEmbed(chanID, v.MessageEmbed)
+
+				}
 			}
 		}); err != nil {
 			sp.logger.error("Error starting "+p.Name+" timed message - ", err)
