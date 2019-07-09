@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/anorb/spudo"
 )
 
@@ -25,15 +23,15 @@ func main() {
 	bot.Start()
 }
 
-func embed(args []string) interface{} {
+func embed(author string, args []string) interface{} {
 	return spudo.NewEmbed().SetTitle("This is a test").SetDescription("This is also a test")
 }
 
-func hello(args []string) interface{} {
-	return fmt.Sprintf("Hello %s", args[0])
+func hello(author string, args []string) interface{} {
+	return "Hello <@" + author + ">"
 }
 
-func ping(args []string) interface{} {
+func ping(author string, args []string) interface{} {
 	return "Pong!"
 }
 

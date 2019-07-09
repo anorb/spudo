@@ -279,12 +279,11 @@ func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
 func (sp *Spudo) attemptCommand(author, channel, comStr string, args []string) (resp interface{}, private bool) {
 	if com, isValid := sp.spudoCommands[comStr]; isValid {
 		resp = com.Exec(author, channel, args...)
-		private = com.PrivateResponse
 		return
 	}
 
 	if com, isValid := sp.commands[comStr]; isValid {
-		resp = com.Exec(args)
+		resp = com.Exec(author, args)
 		private = com.PrivateResponse
 		return
 	}

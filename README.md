@@ -38,7 +38,7 @@ func main() {
 	bot.Start()
 }
 
-func ping(args []string) interface{} {
+func ping(author string, args []string) interface{} {
 	return "Pong!"
 }
 ```

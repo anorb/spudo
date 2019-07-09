@@ -5,7 +5,7 @@ import (
 )
 
 // AddCommand will add a command that will trigger Exec.
-func (sp *Spudo) AddCommand(name, description string, exec func(args []string) interface{}) {
+func (sp *Spudo) AddCommand(name, description string, exec func(author string, args []string) interface{}) {
 	if _, ok := sp.commands[name]; ok {
 		sp.logger.info("Failed to add command: ", name, "- Already exists")
 		return
