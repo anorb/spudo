@@ -1,7 +1,6 @@
 package spudo
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -53,17 +52,9 @@ type Spudo struct {
 
 type unknownCommand string
 
-// NewSpudo will initialize everything Spudo needs to run.
-func NewSpudo() *Spudo {
-	sp := &Spudo{}
-	sp.CooldownList = make(map[string]time.Time)
-	sp.logger = newLogger()
-	sp.commands = make(map[string]*command)
-	sp.timedMessages = make([]*timedMessage, 0)
-	sp.userReactions = make([]*userReaction, 0)
-	sp.messageReactions = make([]*messageReaction, 0)
-
-	sp.spudoCommands = make(map[string]*spudoCommand)
+// Initialize will initialize everything Spudo needs to run.
+func Initialize() *Spudo {
+	sp := newSpudo()
 
 	configPath := flag.String("config", "./config.toml", "TODO")
 	flag.Parse()
@@ -71,7 +62,7 @@ func NewSpudo() *Spudo {
 	// Check if config exists, if it doesn't use
 	// createMinimalConfig to generate one.
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
-		sp.logger.info("Config not detected, attempting to create...")
+		sp.logger.info("Config not detected, creating minimal config...")
 		if err := sp.createMinimalConfig(); err != nil {
 			sp.logger.fatal("Failed to create minimal config", err)
 		}
@@ -80,24 +71,27 @@ func NewSpudo() *Spudo {
 	if err := sp.loadConfig(*configPath); err != nil {
 		sp.logger.fatal(err.Error())
 	}
+
 	return sp
 }
 
-// Ask user for input using prompt and returns the entry and any
-// errors
-func getInput(prompt string) (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(prompt)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	return strings.Replace(input, "\n", "", -1), nil
+// newSpudo setups up the logger and maps for the plugins.
+func newSpudo() *Spudo {
+	sp := &Spudo{}
+	sp.CooldownList = make(map[string]time.Time)
+	sp.logger = newLogger()
+	sp.commands = make(map[string]*command)
+	sp.timedMessages = make([]*timedMessage, 0)
+	sp.userReactions = make([]*userReaction, 0)
+	sp.messageReactions = make([]*messageReaction, 0)
+	sp.spudoCommands = make(map[string]*spudoCommand)
+	return sp
 }
 
 // Returns the default config settings for the bot
 func getDefaultConfig() Config {
 	return Config{
+		Token:                 "",
 		CommandPrefix:         "!",
 		CooldownTimer:         10,
 		CooldownMessage:       "Too many commands at once!",
@@ -108,15 +102,8 @@ func getDefaultConfig() Config {
 // createMinimalConfig prompts the user to enter a Token and for the
 // Config. This is used if no config is found.
 func (sp *Spudo) createMinimalConfig() error {
-	// Set default config
 	sp.Config = getDefaultConfig()
 	path := "./config.toml"
-
-	var err error
-	sp.Config.Token, err = getInput("Enter token: ")
-	if err != nil {
-		return err
-	}
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {

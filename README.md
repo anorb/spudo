@@ -33,7 +33,7 @@ import (
 )
 
 func main() {
-	bot := spudo.NewSpudo()
+	bot := spudo.Initialize()
 	bot.AddCommand("ping", "responds with pong", ping)
 	bot.Start()
 }

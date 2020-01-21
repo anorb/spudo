@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	bot := spudo.NewSpudo()
+	bot := spudo.Initialize()
 	bot.AddCommand("embed", "test embed command", embed)
 	bot.AddCommand("hello", "says hello + whatever argument follows", hello)
 	bot.AddCommand("ping", "responds with pong", ping)
