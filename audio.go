@@ -226,7 +226,7 @@ func (sp *Spudo) cmdPlayMedia(author, channel string, args ...string) interface{
 
 	audioSess.queueMedia(args[0], channel)
 	audioSess.status = statusPlay
-	go audioSess.start(sp.Session)
+	go audioSess.start(sp.SpudoSession)
 	return nil
 }
 
@@ -337,13 +337,17 @@ func (sa *spAudio) queueMedia(audioLink, channel string) voiceCommand {
 	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(audioPos))
 }
 
-func (sa *spAudio) start(sess *discordgo.Session) {
+func (sa *spAudio) start(sess *SpudoSession) {
 	err := sa.Voice.Speaking(true)
 	if err != nil {
 		log.Println("Failed setting speaking: ", err)
 		return
 	}
-	defer sa.Voice.Speaking(false)
+
+	defer func() {
+		err := sa.Voice.Speaking(false)
+		log.Println("Failed to end speaking: ", err)
+	}()
 
 	options := dca.StdEncodeOptions
 	options.RawOutput = true
@@ -368,7 +372,7 @@ func (sa *spAudio) start(sess *discordgo.Session) {
 
 		nowPlaying := fmt.Sprintf("now playing: `%v`", audio.Title)
 		duration := fmt.Sprintf("duration: `%v`", audio.Duration)
-		sess.ChannelMessageSend(audio.sendChannel, nowPlaying+"\n"+duration)
+		sess.SendMessage(audio.sendChannel, nowPlaying+"\n"+duration)
 
 		err = sa.send(stream, done)
 		if err != nil {

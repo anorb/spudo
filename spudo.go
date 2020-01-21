@@ -31,8 +31,8 @@ type Config struct {
 // Spudo contains everything about the bot itself
 type Spudo struct {
 	sync.Mutex
-	CommandMutex  sync.Mutex
-	Session       *discordgo.Session
+	CommandMutex sync.Mutex
+	*SpudoSession
 	Config        Config
 	CooldownList  map[string]time.Time
 	TimersStarted bool
@@ -131,21 +131,13 @@ func (sp *Spudo) loadConfig(configPath string) error {
 	return nil
 }
 
-func (sp *Spudo) createSession() error {
-	session, err := discordgo.New("Bot " + sp.Config.Token)
-	if err != nil {
-		return errors.New("Error creating Discord session - " + err.Error())
-	}
-	sp.Session = session
-	return nil
-}
-
 // Start will add handler functions to the Session and open the
 // websocket connection
 func (sp *Spudo) Start() {
 	rand.Seed(time.Now().UnixNano())
 
-	if err := sp.createSession(); err != nil {
+	var err error
+	if sp.SpudoSession, err = newSpudoSession(sp.Config.Token, sp.logger); err != nil {
 		sp.logger.fatal(err.Error())
 	}
 
@@ -160,10 +152,10 @@ func (sp *Spudo) Start() {
 		go sp.startRESTApi()
 	}
 
-	sp.Session.AddHandler(sp.onReady)
-	sp.Session.AddHandler(sp.onMessageCreate)
+	sp.AddHandler(sp.onReady)
+	sp.AddHandler(sp.onMessageCreate)
 
-	if err := sp.Session.Open(); err != nil {
+	if err := sp.Open(); err != nil {
 		sp.logger.fatal("Error opening websocket connection -", err)
 	}
 
@@ -184,7 +176,7 @@ func (sp *Spudo) quit() {
 			sp.logger.fatal("Error disconnecting from voice channel:", err)
 		}
 	}
-	if err := sp.Session.Close(); err != nil {
+	if err := sp.Close(); err != nil {
 		sp.logger.fatal("Error closing discord session:", err)
 	}
 	os.Exit(1)
@@ -211,19 +203,10 @@ func (sp *Spudo) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreat
 	go sp.handleMessageReaction(m)
 }
 
-// SendMessage is a helper function around ChannelMessageSend from
-// discordgo. It will send a message to a given channel.
-func (sp *Spudo) SendMessage(channelID string, message string) {
-	_, err := sp.Session.ChannelMessageSend(channelID, message)
-	if err != nil {
-		sp.logger.error("Failed to send message response -", err)
-	}
-}
-
 // sendEmbed is a helper function around ChannelMessageSendEmbed from
 // discordgo. It will send an embed message to a given channel.
 func (sp *Spudo) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
-	_, err := sp.Session.ChannelMessageSendEmbed(channelID, embed)
+	_, err := sp.ChannelMessageSendEmbed(channelID, embed)
 	if err != nil {
 		sp.logger.error("Failed to send embed message response -", err)
 	}
@@ -232,7 +215,7 @@ func (sp *Spudo) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
 // sendPrivateMessage creates a UserChannel before attempting to send
 // a message directly to a user rather than in the server channel.
 func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
-	privChannel, err := sp.Session.UserChannelCreate(userID)
+	privChannel, err := sp.UserChannelCreate(userID)
 	if err != nil {
 		sp.logger.error("Error creating private channel -", err)
 		return
@@ -254,7 +237,7 @@ func (sp *Spudo) respondToUser(m *discordgo.MessageCreate, response string) {
 // addReaction is a helper method around MessageReactionAdd from
 // discordgo. It adds a reaction to a given message.
 func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
-	if err := sp.Session.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
+	if err := sp.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
 		sp.logger.error("Error adding reaction -", err)
 	}
 }
