@@ -3,7 +3,6 @@ package spudo
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -249,7 +248,7 @@ func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
 // respondToUser is a helper method around SendMessage that will
 // mention the user who created the message.
 func (sp *Spudo) respondToUser(m *discordgo.MessageCreate, response string) {
-	sp.SendMessage(m.ChannelID, fmt.Sprintf("%s", m.Author.Mention()+" "+response))
+	sp.SendMessage(m.ChannelID, m.Author.Mention()+" "+response)
 }
 
 // addReaction is a helper method around MessageReactionAdd from
@@ -289,7 +288,7 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 	commandText := strings.Split(strings.TrimPrefix(m.Content, sp.Config.CommandPrefix), " ")
 
 	com := strings.ToLower(commandText[0])
-	args := commandText[1:len(commandText)]
+	args := commandText[1:]
 
 	commandResp, isPrivate := sp.attemptCommand(m.Author.ID, m.ChannelID, com, args)
 
