@@ -162,7 +162,7 @@ func (sp *Spudo) Start() {
 	sp.logger.info("Bot is now running. Press CTRL-C to exit.")
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	<-c
 
 	sp.quit()
