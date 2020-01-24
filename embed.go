@@ -83,6 +83,9 @@ func (e *Embed) SetFooter(args ...string) *Embed {
 	}
 	if len(args) > 0 {
 		text = args[0]
+		if len(text) > embedLimitFooter {
+			text = text[:embedLimitFooter]
+		}
 	}
 	if len(args) > 1 {
 		iconURL = args[1]
@@ -164,6 +167,9 @@ func (e *Embed) SetAuthor(args ...string) *Embed {
 	}
 	if len(args) > 0 {
 		name = args[0]
+		if len(name) > embedLimitAuthor {
+			name = name[:embedLimitAuthor]
+		}
 	}
 	if len(args) > 1 {
 		iconURL = args[1]
