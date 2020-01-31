@@ -203,15 +203,6 @@ func (sp *Spudo) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreat
 	go sp.handleMessageReaction(m)
 }
 
-// sendEmbed is a helper function around ChannelMessageSendEmbed from
-// discordgo. It will send an embed message to a given channel.
-func (sp *Spudo) sendEmbed(channelID string, embed *discordgo.MessageEmbed) {
-	_, err := sp.ChannelMessageSendEmbed(channelID, embed)
-	if err != nil {
-		sp.logger.error("Failed to send embed message response -", err)
-	}
-}
-
 // sendPrivateMessage creates a UserChannel before attempting to send
 // a message directly to a user rather than in the server channel.
 func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
@@ -224,7 +215,7 @@ func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
 	case string:
 		sp.SendMessage(privChannel.ID, v)
 	case *discordgo.MessageEmbed:
-		sp.sendEmbed(privChannel.ID, v)
+		sp.SendEmbed(privChannel.ID, v)
 	}
 }
 
@@ -232,14 +223,6 @@ func (sp *Spudo) sendPrivateMessage(userID string, message interface{}) {
 // mention the user who created the message.
 func (sp *Spudo) respondToUser(m *discordgo.MessageCreate, response string) {
 	sp.SendMessage(m.ChannelID, m.Author.Mention()+" "+response)
-}
-
-// addReaction is a helper method around MessageReactionAdd from
-// discordgo. It adds a reaction to a given message.
-func (sp *Spudo) addReaction(m *discordgo.MessageCreate, reactionID string) {
-	if err := sp.MessageReactionAdd(m.ChannelID, m.ID, reactionID); err != nil {
-		sp.logger.error("Error adding reaction -", err)
-	}
 }
 
 // attemptCommand will check if comStr is in the commands map. If it
@@ -288,7 +271,7 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 		if isPrivate {
 			sp.sendPrivateMessage(m.Author.ID, v.MessageEmbed)
 		} else {
-			sp.sendEmbed(m.ChannelID, v.MessageEmbed)
+			sp.SendEmbed(m.ChannelID, v.MessageEmbed)
 		}
 		sp.startCooldown(m.Author.ID)
 	case voiceCommand:
@@ -303,7 +286,7 @@ func (sp *Spudo) handleUserReaction(m *discordgo.MessageCreate) {
 		for _, user := range ur.UserIDs {
 			if user == m.Author.ID {
 				for _, reaction := range ur.ReactionIDs {
-					sp.addReaction(m, reaction)
+					sp.AddReaction(m, reaction)
 				}
 			}
 		}
@@ -315,7 +298,7 @@ func (sp *Spudo) handleMessageReaction(m *discordgo.MessageCreate) {
 		for _, trigger := range mr.TriggerWords {
 			if strings.Contains(strings.ToLower(m.Content), strings.ToLower(trigger)) {
 				for _, reaction := range mr.ReactionIDs {
-					sp.addReaction(m, reaction)
+					sp.AddReaction(m, reaction)
 				}
 			}
 		}
@@ -350,7 +333,7 @@ func (sp *Spudo) startTimedMessages() {
 				}
 			case *Embed:
 				for _, chanID := range p.Channels {
-					sp.sendEmbed(chanID, v.MessageEmbed)
+					sp.SendEmbed(chanID, v.MessageEmbed)
 
 				}
 			}
