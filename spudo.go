@@ -322,9 +322,9 @@ func (sp *Spudo) startCooldown(user string) {
 func (sp *Spudo) startTimedMessages() {
 	for _, p := range sp.timedMessages {
 
-		c := cron.NewWithLocation(time.UTC)
+		c := cron.New(cron.WithLocation(time.UTC))
 
-		if err := c.AddFunc(p.CronString, func() {
+		if _, err := c.AddFunc(p.CronString, func() {
 			timerFunc := p.Exec()
 			switch v := timerFunc.(type) {
 			case string:
