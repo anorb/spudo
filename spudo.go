@@ -13,7 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/bwmarrin/discordgo"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 )
 
 // Config contains all options for the config file
