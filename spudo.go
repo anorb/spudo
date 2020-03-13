@@ -274,6 +274,10 @@ func (sp *Spudo) handleCommand(m *discordgo.MessageCreate) {
 			sp.SendEmbed(m.ChannelID, v.MessageEmbed)
 		}
 		sp.startCooldown(m.Author.ID)
+	case *Complex:
+		defer v.file.Close()
+		sp.SendComplex(m.ChannelID, v.MessageSend)
+		sp.startCooldown(m.Author.ID)
 	case voiceCommand:
 		sp.SendMessage(m.ChannelID, string(v))
 	case unknownCommand:

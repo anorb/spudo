@@ -35,6 +35,13 @@ func (ss *Spudo) SendEmbed(channelID string, embed *discordgo.MessageEmbed) {
 	}
 }
 
+func (ss *Spudo) SendComplex(channelID string, ms *discordgo.MessageSend) {
+	_, err := ss.ChannelMessageSendComplex(channelID, ms)
+	if err != nil {
+		ss.logger.error("Failed to send complex message response -", err)
+	}
+}
+
 // AddReaction is a helper method around MessageReactionAdd from
 // discordgo. It adds a reaction to a given message.
 func (ss *Spudo) AddReaction(m *discordgo.MessageCreate, reactionID string) {
