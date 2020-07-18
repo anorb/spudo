@@ -12,7 +12,27 @@ type Complex struct {
 	file *os.File
 }
 
-func NewComplex(fileName string) *Complex {
+func NewComplex(message, fileName string) *Complex {
+	c := &Complex{}
+	var err error
+	c.file, err = os.Open(fileName)
+	if err != nil {
+		log.Println("Error opening file: ", err)
+	}
+
+	c.MessageSend = &discordgo.MessageSend{
+		Content: message,
+		Files: []*discordgo.File{
+			&discordgo.File{
+				Name:   fileName,
+				Reader: c.file,
+			},
+		},
+	}
+	return c
+}
+
+func NewComplexAttachment(fileName string) *Complex {
 	c := &Complex{}
 	var err error
 	c.file, err = os.Open(fileName)
