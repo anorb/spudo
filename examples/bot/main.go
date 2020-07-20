@@ -7,6 +7,7 @@ import (
 func main() {
 	bot := spudo.Initialize()
 	bot.AddCommand("embed", "test embed command", embed)
+	bot.AddCommand("complex", "image attachment (rather than imbed)", complexAttachment)
 	bot.AddCommand("hello", "says hello + whatever argument follows", hello)
 	bot.AddCommand("ping", "responds with pong", ping)
 
@@ -25,6 +26,10 @@ func main() {
 
 func embed(author string, args []string) interface{} {
 	return spudo.NewEmbed().SetTitle("This is a test").SetDescription("This is also a test")
+}
+
+func complexAttachment(author string, args []string) interface{} {
+	return spudo.NewComplexAttachment("smiley.png")
 }
 
 func hello(author string, args []string) interface{} {
