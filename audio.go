@@ -24,9 +24,9 @@ const (
 )
 
 var (
-	errBadVoiceState    = errors.New("Unable to find user voice state")
-	errBadQueuePosition = errors.New("Bad queue position")
-	errEndOfQueue       = errors.New("End of queue")
+	errBadVoiceState    = errors.New("unable to find user voice state")
+	errBadQueuePosition = errors.New("bad queue position")
+	errEndOfQueue       = errors.New("end of queue")
 )
 
 var vcSameChannelMsg = voiceCommand("you must be in the same channel to use this command")
@@ -226,7 +226,7 @@ func (sp *Spudo) cmdPlayMedia(author, channel string, args ...string) interface{
 
 	audioSess.queueMedia(args[0], channel)
 	audioSess.status = statusPlay
-	go audioSess.start(sp.SpudoSession)
+	go audioSess.start(sp.session)
 	return nil
 }
 
@@ -337,7 +337,7 @@ func (sa *spAudio) queueMedia(audioLink, channel string) voiceCommand {
 	return voiceCommand("queued `" + a.VideoInfo.Title + "` in position " + strconv.Itoa(audioPos))
 }
 
-func (sa *spAudio) start(sess *SpudoSession) {
+func (sa *spAudio) start(sess *session) {
 	err := sa.Voice.Speaking(true)
 	if err != nil {
 		log.Println("Failed setting speaking: ", err)

@@ -23,7 +23,7 @@ func NewComplex(message, fileName string) *Complex {
 	c.MessageSend = &discordgo.MessageSend{
 		Content: message,
 		Files: []*discordgo.File{
-			&discordgo.File{
+			{
 				Name:   fileName,
 				Reader: c.file,
 			},
@@ -42,7 +42,7 @@ func NewComplexAttachment(fileName string) *Complex {
 
 	c.MessageSend = &discordgo.MessageSend{
 		Files: []*discordgo.File{
-			&discordgo.File{
+			{
 				Name:   fileName,
 				Reader: c.file,
 			},

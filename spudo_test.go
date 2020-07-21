@@ -16,7 +16,7 @@ func TestCreateSession(t *testing.T) {
 	bot.Config.Token = "test"
 	bot.logger = newLogger()
 	var err error
-	if bot.SpudoSession, err = newSpudoSession(bot.Config.Token, bot.logger); err != nil {
+	if bot.session, err = newSession(bot.Config.Token, bot.logger); err != nil {
 		t.Errorf("Error creating session - %s", err.Error())
 	}
 }

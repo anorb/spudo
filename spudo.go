@@ -32,7 +32,7 @@ type Config struct {
 type Spudo struct {
 	sync.Mutex
 	CommandMutex sync.Mutex
-	*SpudoSession
+	*session
 	Config        Config
 	CooldownList  map[string]time.Time
 	TimersStarted bool
@@ -126,7 +126,7 @@ func (sp *Spudo) loadConfig(configPath string) error {
 	}
 
 	if sp.Config.Token == "" {
-		return errors.New("No token in config")
+		return errors.New("no token in config")
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (sp *Spudo) Start() {
 	rand.Seed(time.Now().UnixNano())
 
 	var err error
-	if sp.SpudoSession, err = newSpudoSession(sp.Config.Token, sp.logger); err != nil {
+	if sp.session, err = newSession(sp.Config.Token, sp.logger); err != nil {
 		sp.logger.fatal(err.Error())
 	}
 
@@ -325,7 +325,6 @@ func (sp *Spudo) startCooldown(user string) {
 // Starts all TimedMessages.
 func (sp *Spudo) startTimedMessages() {
 	for _, p := range sp.timedMessages {
-
 		c := cron.New(cron.WithLocation(time.UTC))
 
 		if _, err := c.AddFunc(p.CronString, func() {
@@ -338,7 +337,6 @@ func (sp *Spudo) startTimedMessages() {
 			case *Embed:
 				for _, chanID := range p.Channels {
 					sp.SendEmbed(chanID, v.MessageEmbed)
-
 				}
 			}
 		}); err != nil {

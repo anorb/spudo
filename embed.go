@@ -191,8 +191,8 @@ func (e *Embed) SetAuthor(args ...string) *Embed {
 }
 
 // SetURL sets the URL of the Embed. Returns the modified Embed.
-func (e *Embed) SetURL(URL string) *Embed {
-	e.URL = URL
+func (e *Embed) SetURL(url string) *Embed {
+	e.URL = url
 	return e
 }
 
